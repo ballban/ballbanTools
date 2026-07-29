@@ -681,9 +681,7 @@
     const btn = document.getElementById("tbf-float-btn");
     if (!btn) return;
 
-    const accountBtn = document.querySelector(
-      '[data-testid="SideNav_AccountSwitcher_Button"]'
-    );
+    const accountBtn = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
     if (accountBtn) {
       const rect = accountBtn.getBoundingClientRect();
       btn.style.position = "fixed";
@@ -799,9 +797,7 @@
     // Tab 切换
     overlay.querySelectorAll(".tbf-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
-        overlay
-          .querySelectorAll(".tbf-tab")
-          .forEach((t) => t.classList.remove("tbf-active"));
+        overlay.querySelectorAll(".tbf-tab").forEach((t) => t.classList.remove("tbf-active"));
         overlay
           .querySelectorAll(".tbf-tab-content")
           .forEach((c) => c.classList.remove("tbf-active"));
@@ -825,10 +821,7 @@
 
     // 添加规则
     ["content", "author"].forEach((type) => {
-      const key =
-        type === "content"
-          ? STORAGE_KEYS.contentFilters
-          : STORAGE_KEYS.authorFilters;
+      const key = type === "content" ? STORAGE_KEYS.contentFilters : STORAGE_KEYS.authorFilters;
       const addBtn = overlay.querySelector(`#tbf-${type}-add`);
       const input = overlay.querySelector(`#tbf-${type}-input`);
       const typeToggle = overlay.querySelector(`#tbf-${type}-type`);
@@ -892,10 +885,7 @@
   }
 
   function refreshRulesList(type) {
-    const key =
-      type === "content"
-        ? STORAGE_KEYS.contentFilters
-        : STORAGE_KEYS.authorFilters;
+    const key = type === "content" ? STORAGE_KEYS.contentFilters : STORAGE_KEYS.authorFilters;
     const container = document.getElementById(`tbf-${type}-rules`);
     if (!container) return;
 
@@ -927,7 +917,7 @@
               ${f.isRegex ? "正则" : "文本"}
             </span>
             <div class="tbf-rule-details">
-              ${f.name ? `<div class="tbf-rule-name-display">${escapeHtml(f.name)}</div>` : ''}
+              ${f.name ? `<div class="tbf-rule-name-display">${escapeHtml(f.name)}</div>` : ""}
               <div class="tbf-rule-pattern">${escapeHtml(f.pattern)}</div>
             </div>
             <label class="tbf-toggle-switch">
@@ -1022,6 +1012,7 @@
 
   const PROCESSED_ATTR = "data-tbf-processed";
   const COLLAPSED_ATTR = "data-tbf-collapsed";
+  const BLOCK_BUTTON_PENDING_ATTR = "data-tbf-block-button-pending";
 
   function matchesFilter(text, filters) {
     if (!text) return null;
@@ -1068,7 +1059,7 @@
     const userNameEl = tweetEl.querySelector('[data-testid="User-Name"]');
     if (!userNameEl) return null;
     // 显示名称在第一个 <a> 链接内
-    const firstLink = userNameEl.querySelector('a[href]');
+    const firstLink = userNameEl.querySelector("a[href]");
     if (!firstLink) return null;
     return extractTextWithEmoji(firstLink);
   }
@@ -1122,15 +1113,16 @@
 
     // 检查作者过滤（同时匹配 handle 和 显示名称）
     const authorMatch =
-      matchesFilter(authorHandle, authorFilters) ||
-      matchesFilter(authorDisplayName, authorFilters);
+      matchesFilter(authorHandle, authorFilters) || matchesFilter(authorDisplayName, authorFilters);
     if (authorMatch) {
       collapseTweet(tweetEl, "作者规则", authorMatch);
       return;
     }
 
-    // 未匹配 → 注入拉黑按钮
-    injectBlockButton(tweetEl);
+    // 未匹配 → 注入拉黑按钮；右上角菜单可能稍后才挂载
+    if (!injectBlockButton(tweetEl)) {
+      observeForBlockButtonAnchor(tweetEl);
+    }
   }
 
   function collapseTweet(tweetEl, ruleType, matchedFilter) {
@@ -1182,12 +1174,10 @@
     document.querySelectorAll(".tbf-collapsed-hint").forEach((hint) => {
       hint.remove();
     });
-    document
-      .querySelectorAll(`[${COLLAPSED_ATTR}]`)
-      .forEach((el) => {
-        el.style.display = "";
-        el.removeAttribute(COLLAPSED_ATTR);
-      });
+    document.querySelectorAll(`[${COLLAPSED_ATTR}]`).forEach((el) => {
+      el.style.display = "";
+      el.removeAttribute(COLLAPSED_ATTR);
+    });
     filteredCount = 0;
     updateFilteredCount(0);
   }
@@ -1195,23 +1185,22 @@
   function reprocessAllTweets() {
     // 清除所有折叠和标记
     uncollapseAll();
-    document
-      .querySelectorAll(`[${PROCESSED_ATTR}]`)
-      .forEach((el) => {
-        el.removeAttribute(PROCESSED_ATTR);
-        // 移除拉黑按钮
-        el.querySelectorAll(".tbf-block-btn").forEach((btn) => btn.remove());
-      });
+    document.querySelectorAll(`[${PROCESSED_ATTR}]`).forEach((el) => {
+      el.removeAttribute(PROCESSED_ATTR);
+      // 移除拉黑按钮
+      el.querySelectorAll(".tbf-block-btn").forEach((btn) => btn.remove());
+    });
     // 重新处理所有推文
-    document
-      .querySelectorAll('article[data-testid="tweet"]')
-      .forEach(processTweet);
+    document.querySelectorAll('article[data-testid="tweet"]').forEach(processTweet);
   }
 
   // ---- 拉黑按钮 ----
   function injectBlockButton(tweetEl) {
     // 避免重复注入
-    if (tweetEl.querySelector(".tbf-block-btn")) return;
+    if (tweetEl.querySelector(".tbf-block-btn")) return true;
+
+    const caretBtn = tweetEl.querySelector('[data-testid="caret"]');
+    if (!caretBtn || !caretBtn.parentElement) return false;
 
     const btn = document.createElement("button");
     btn.className = "tbf-block-btn";
@@ -1224,19 +1213,35 @@
       performBlock(tweetEl, btn);
     });
 
-    // 找到推文中 caret 按钮所在的区域并插入旁边
-    const caretBtn = tweetEl.querySelector('[data-testid="caret"]');
-    if (caretBtn && caretBtn.parentElement) {
-      caretBtn.parentElement.insertBefore(btn, caretBtn);
-    } else {
-      // fallback: 插入到推文的第一行末尾
-      const firstRow = tweetEl.querySelector(
-        '[data-testid="User-Name"]'
-      );
-      if (firstRow && firstRow.parentElement) {
-        firstRow.parentElement.appendChild(btn);
+    caretBtn.parentElement.insertBefore(btn, caretBtn);
+    return true;
+  }
+
+  function observeForBlockButtonAnchor(tweetEl) {
+    if (tweetEl.getAttribute(BLOCK_BUTTON_PENDING_ATTR)) return;
+    tweetEl.setAttribute(BLOCK_BUTTON_PENDING_ATTR, "1");
+
+    let timeoutId;
+    const observer = new MutationObserver(() => {
+      if (!tweetEl.isConnected || tweetEl.getAttribute(COLLAPSED_ATTR)) {
+        cleanup();
+        return;
       }
-    }
+      if (injectBlockButton(tweetEl)) cleanup();
+    });
+
+    const cleanup = () => {
+      observer.disconnect();
+      clearTimeout(timeoutId);
+      tweetEl.removeAttribute(BLOCK_BUTTON_PENDING_ATTR);
+    };
+
+    observer.observe(tweetEl, {
+      childList: true,
+      subtree: true,
+    });
+
+    timeoutId = setTimeout(cleanup, 5000);
   }
 
   async function performBlock(tweetEl, blockBtn) {
@@ -1250,18 +1255,12 @@
       caret.click();
 
       // Step 2: 等待菜单出现并点击拉黑
-      const blockMenuItem = await waitForElement(
-        '[data-testid="block"]',
-        2000
-      );
+      const blockMenuItem = await waitForElement('[data-testid="block"]', 2000);
       if (!blockMenuItem) throw new Error("找不到拉黑选项");
       blockMenuItem.click();
 
       // Step 3: 等待确认弹窗并点击确认
-      const confirmBtn = await waitForElement(
-        '[data-testid="confirmationSheetConfirm"]',
-        2000
-      );
+      const confirmBtn = await waitForElement('[data-testid="confirmationSheetConfirm"]', 2000);
       if (!confirmBtn) throw new Error("找不到确认按钮");
       confirmBtn.click();
 
@@ -1329,18 +1328,13 @@
           if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
           // 如果添加的节点本身是推文
-          if (
-            node.matches &&
-            node.matches('article[data-testid="tweet"]')
-          ) {
+          if (node.matches && node.matches('article[data-testid="tweet"]')) {
             processTweet(node);
           }
 
           // 检查子元素中的推文
           if (node.querySelectorAll) {
-            node
-              .querySelectorAll('article[data-testid="tweet"]')
-              .forEach(processTweet);
+            node.querySelectorAll('article[data-testid="tweet"]').forEach(processTweet);
           }
         }
       }
@@ -1363,11 +1357,12 @@
 
     const defaultContentFilters = [
       {
-        pattern: "^\\s*\\p{Extended_Pictographic}(\\uFE0F|\\u200D\\p{Extended_Pictographic}|\\p{Emoji_Modifier})*\\s*$",
+        pattern:
+          "^\\s*\\p{Extended_Pictographic}(\\uFE0F|\\u200D\\p{Extended_Pictographic}|\\p{Emoji_Modifier})*\\s*$",
         isRegex: true,
         enabled: true,
-        name: "单个Emoji"
-      }
+        name: "单个Emoji",
+      },
     ];
 
     // 仅在没有已有规则时写入默认值
@@ -1388,9 +1383,7 @@
     createFloatButton();
 
     // 处理页面上已有的推文
-    document
-      .querySelectorAll('article[data-testid="tweet"]')
-      .forEach(processTweet);
+    document.querySelectorAll('article[data-testid="tweet"]').forEach(processTweet);
 
     // 启动 MutationObserver
     startObserver();
