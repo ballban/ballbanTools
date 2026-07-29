@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.1
+// @version      1.0.2
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -116,17 +116,31 @@
 
   let filteredCount = 0;
 
-  function updateFilteredCount(delta) {
-    filteredCount += delta;
+  function isHomePage() {
+    return window.location.pathname.startsWith("/home");
+  }
+
+  function renderFilteredCount() {
     const badge = document.getElementById("tbf-badge");
     if (badge) {
-      badge.textContent = filteredCount > 0 ? filteredCount : "";
-      badge.style.display = filteredCount > 0 ? "flex" : "none";
+      const shouldShowBadge = !isHomePage() && filteredCount > 0;
+      badge.textContent = shouldShowBadge ? filteredCount : "";
+      badge.style.display = shouldShowBadge ? "flex" : "none";
     }
     const statsEl = document.getElementById("tbf-stats");
     if (statsEl) {
       statsEl.textContent = `已过滤 ${filteredCount} 条推文`;
     }
+  }
+
+  function updateFilteredCount(delta) {
+    filteredCount += delta;
+    renderFilteredCount();
+  }
+
+  function resetFilteredCount() {
+    filteredCount = 0;
+    renderFilteredCount();
   }
 
   // ============================================================
@@ -1345,6 +1359,36 @@
     });
   }
 
+  function startRouteObserver() {
+    let currentLocation = window.location.href;
+
+    const handleRouteChange = () => {
+      const nextLocation = window.location.href;
+      if (nextLocation === currentLocation) return;
+
+      currentLocation = nextLocation;
+      resetFilteredCount();
+    };
+
+    const originalPushState = window.history.pushState;
+    window.history.pushState = function (...args) {
+      const result = originalPushState.apply(this, args);
+      handleRouteChange();
+      return result;
+    };
+
+    const originalReplaceState = window.history.replaceState;
+    window.history.replaceState = function (...args) {
+      const result = originalReplaceState.apply(this, args);
+      handleRouteChange();
+      return result;
+    };
+
+    window.addEventListener("popstate", handleRouteChange);
+    window.addEventListener("hashchange", handleRouteChange);
+    renderFilteredCount();
+  }
+
   // ============================================================
   // 7. 初始化
   // ============================================================
@@ -1386,6 +1430,9 @@
 
     // 启动 MutationObserver
     startObserver();
+
+    // 监听 X 的单页路由切换，避免首页显示其他页面遗留的过滤统计
+    startRouteObserver();
 
     // 监听窗口大小变化，重新定位按钮与面板
     window.addEventListener("resize", () => {
