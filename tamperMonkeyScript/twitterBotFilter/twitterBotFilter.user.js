@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.2
+// @version      1.0.3
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -324,7 +324,8 @@
       width: 100%;
       box-sizing: border-box;
     }
-    .tbf-add-row input[type="text"] {
+    .tbf-add-row input[type="text"],
+    .tbf-add-row textarea {
       padding: 8px 10px;
       border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.1);
@@ -343,11 +344,19 @@
     .tbf-input-pattern {
       flex: 2;
     }
-    .tbf-add-row input[type="text"]:focus {
+    .tbf-add-row textarea.tbf-input-pattern {
+      min-height: 64px;
+      line-height: 1.4;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .tbf-add-row input[type="text"]:focus,
+    .tbf-add-row textarea:focus {
       border-color: rgba(29, 155, 240, 0.5);
       box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.12);
     }
-    .tbf-add-row input[type="text"]::placeholder {
+    .tbf-add-row input[type="text"]::placeholder,
+    .tbf-add-row textarea::placeholder {
       color: #555e68;
     }
 
@@ -707,6 +716,47 @@
   let panelOpen = false;
   let editingState = null; // { type: 'content' | 'author', idx: number }
 
+  function setRuleFormType(type, isRegex) {
+    const typeToggle = document.getElementById(`tbf-${type}-type`);
+    if (!typeToggle) return;
+    typeToggle.dataset.regex = String(isRegex);
+    typeToggle.textContent = isRegex ? "正则" : "字符串";
+    typeToggle.classList.toggle("tbf-regex", isRegex);
+  }
+
+  function setRuleFormMode(type, isEditing) {
+    const actionButton = document.getElementById(`tbf-${type}-add`);
+    if (!actionButton) return;
+    actionButton.textContent = isEditing ? "修改" : "添加";
+    actionButton.dataset.mode = isEditing ? "edit" : "add";
+  }
+
+  function resetRuleForm(type) {
+    const nameInput = document.getElementById(`tbf-${type}-name`);
+    const patternInput = document.getElementById(`tbf-${type}-input`);
+    if (!nameInput || !patternInput) return;
+
+    nameInput.value = "";
+    patternInput.value = "";
+    setRuleFormType(type, false);
+    setRuleFormMode(type, false);
+  }
+
+  function beginEdit(type, idx) {
+    const key = type === "content" ? STORAGE_KEYS.contentFilters : STORAGE_KEYS.authorFilters;
+    const filter = loadFilters(key)[idx];
+    const nameInput = document.getElementById(`tbf-${type}-name`);
+    const patternInput = document.getElementById(`tbf-${type}-input`);
+    if (!filter || !nameInput || !patternInput) return;
+
+    editingState = { type, idx };
+    nameInput.value = filter.name || "";
+    patternInput.value = filter.pattern || "";
+    setRuleFormType(type, Boolean(filter.isRegex));
+    setRuleFormMode(type, true);
+    patternInput.focus();
+  }
+
   function positionPanel() {
     const btn = document.getElementById("tbf-float-btn");
     const panel = document.getElementById("tbf-panel");
@@ -741,6 +791,8 @@
 
     if (panelOpen) {
       editingState = null;
+      resetRuleForm("content");
+      resetRuleForm("author");
       refreshRulesList("content");
       refreshRulesList("author");
       updateFilteredCount(0);
@@ -773,7 +825,7 @@
         <div class="tbf-tab-content tbf-active" data-tab-content="content">
           <div class="tbf-add-row">
             <input type="text" id="tbf-content-name" class="tbf-input-name" placeholder="名称(可选)" />
-            <input type="text" id="tbf-content-input" class="tbf-input-pattern" placeholder="过滤文字或正则..." />
+            <textarea id="tbf-content-input" class="tbf-input-pattern" rows="3" placeholder="过滤文字或正则..."></textarea>
             <button class="tbf-type-toggle" id="tbf-content-type" data-regex="false">字符串</button>
             <button class="tbf-add-btn" id="tbf-content-add">添加</button>
           </div>
@@ -809,6 +861,10 @@
     // Tab 切换
     overlay.querySelectorAll(".tbf-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
+        if (editingState) {
+          resetRuleForm(editingState.type);
+          editingState = null;
+        }
         overlay.querySelectorAll(".tbf-tab").forEach((t) => t.classList.remove("tbf-active"));
         overlay
           .querySelectorAll(".tbf-tab-content")
@@ -845,9 +901,17 @@
         if (!pattern) return;
         const isRegex = typeToggle.dataset.regex === "true";
         const name = nameInput.value.trim();
-        if (addFilter(key, pattern, isRegex, name)) {
-          input.value = "";
-          nameInput.value = "";
+        const currentEdit = editingState && editingState.type === type ? editingState : null;
+        const saved = currentEdit
+          ? updateFilter(key, currentEdit.idx, pattern, isRegex, name)
+          : addFilter(key, pattern, isRegex, name);
+
+        if (saved) {
+          if (currentEdit) {
+            editingState = null;
+            showToast("✅ 规则已更新");
+          }
+          resetRuleForm(type);
           refreshRulesList(type);
           reprocessAllTweets();
         }
@@ -855,7 +919,10 @@
 
       addBtn.addEventListener("click", doAdd);
       input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") doAdd();
+        if (e.key !== "Enter") return;
+        if (input.tagName === "TEXTAREA" && !e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        doAdd();
       });
     });
 
@@ -910,21 +977,12 @@
 
     container.innerHTML = filters
       .map((f, i) => {
-        const isEditing = editingState && editingState.type === type && editingState.idx === i;
-        if (isEditing) {
-          return `
-            <div class="tbf-rule-item tbf-rule-editing">
-              <input type="text" class="tbf-edit-name-in" value="${escapeHtml(f.name || "")}" placeholder="名称" style="width: 90px; padding: 4px 6px; font-size: 12px; border-radius: 6px; border: 1px solid rgba(29,155,240,0.6); background: rgba(0,0,0,0.4); color: #fff; outline:none;" />
-              <input type="text" class="tbf-edit-pattern-in" value="${escapeHtml(f.pattern)}" placeholder="表达式" style="flex: 1; min-width: 0; padding: 4px 6px; font-size: 12px; border-radius: 6px; border: 1px solid rgba(29,155,240,0.6); background: rgba(0,0,0,0.4); color: #fff; outline:none;" />
-              <button class="tbf-type-toggle tbf-edit-type-btn ${f.isRegex ? "tbf-regex" : ""}" data-regex="${f.isRegex}" style="padding: 4px 8px; font-size: 11px;">${f.isRegex ? "正则" : "文本"}</button>
-              <button class="tbf-edit-save-btn" data-idx="${i}" data-action="save-edit" title="保存" style="padding: 4px 8px; border-radius: 6px; border: none; background: #1d9bf0; color: #fff; font-size: 11px; cursor: pointer; font-weight: 600;">💾</button>
-              <button class="tbf-edit-cancel-btn" data-idx="${i}" data-action="cancel-edit" title="取消" style="padding: 4px 8px; border-radius: 6px; border: none; background: rgba(255,255,255,0.1); color: #8899a6; font-size: 11px; cursor: pointer;">✕</button>
-            </div>
-          `;
-        }
-
         return `
           <div class="tbf-rule-item">
+            <label class="tbf-toggle-switch">
+              <input type="checkbox" ${f.enabled ? "checked" : ""} data-idx="${i}" data-action="toggle" />
+              <span class="tbf-toggle-slider"></span>
+            </label>
             <span class="tbf-rule-tag ${f.isRegex ? "tbf-tag-regex" : "tbf-tag-str"}">
               ${f.isRegex ? "正则" : "文本"}
             </span>
@@ -932,10 +990,6 @@
               ${f.name ? `<div class="tbf-rule-name-display">${escapeHtml(f.name)}</div>` : ""}
               <div class="tbf-rule-pattern">${escapeHtml(f.pattern)}</div>
             </div>
-            <label class="tbf-toggle-switch">
-              <input type="checkbox" ${f.enabled ? "checked" : ""} data-idx="${i}" data-action="toggle" />
-              <span class="tbf-toggle-slider"></span>
-            </label>
             <button class="tbf-edit-btn" data-idx="${i}" data-action="edit" title="编辑规则">✏️</button>
             <button class="tbf-delete-btn" data-idx="${i}" data-action="delete" title="删除规则">🗑️</button>
           </div>
@@ -959,6 +1013,7 @@
           e.stopPropagation();
           removeFilter(key, idx);
           if (editingState && editingState.type === type && editingState.idx === idx) {
+            resetRuleForm(type);
             editingState = null;
           }
           refreshRulesList(type);
@@ -967,48 +1022,9 @@
       } else if (action === "edit") {
         el.addEventListener("click", (e) => {
           e.stopPropagation();
-          editingState = { type, idx };
-          refreshRulesList(type);
-        });
-      } else if (action === "save-edit") {
-        el.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const itemEl = el.closest(".tbf-rule-editing");
-          const nameInput = itemEl.querySelector(".tbf-edit-name-in");
-          const patternInput = itemEl.querySelector(".tbf-edit-pattern-in");
-          const typeBtn = itemEl.querySelector(".tbf-edit-type-btn");
-          const isRegex = typeBtn.dataset.regex === "true";
-
-          const newPattern = patternInput.value.trim();
-          const newName = nameInput.value.trim();
-
-          if (!newPattern) return;
-
-          if (updateFilter(key, idx, newPattern, isRegex, newName)) {
-            editingState = null;
-            refreshRulesList(type);
-            reprocessAllTweets();
-            showToast("✅ 规则已更新");
-          }
-        });
-      } else if (action === "cancel-edit") {
-        el.addEventListener("click", (e) => {
-          e.stopPropagation();
-          editingState = null;
-          refreshRulesList(type);
+          beginEdit(type, idx);
         });
       }
-    });
-
-    // 编辑模式中的类型切换按钮绑定
-    container.querySelectorAll(".tbf-edit-type-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isRegex = btn.dataset.regex === "true";
-        btn.dataset.regex = String(!isRegex);
-        btn.textContent = isRegex ? "正则" : "文本";
-        btn.classList.toggle("tbf-regex", !isRegex);
-      });
     });
   }
 
