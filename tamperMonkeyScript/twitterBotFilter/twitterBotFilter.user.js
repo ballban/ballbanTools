@@ -1089,32 +1089,33 @@
   }
 
   function processTweet(tweetEl) {
-    // 如果当前处于 /home 页面，跳过推文过滤处理
-    if (window.location.pathname.startsWith("/home")) return;
-
     if (tweetEl.getAttribute(PROCESSED_ATTR)) return;
     tweetEl.setAttribute(PROCESSED_ATTR, "1");
 
-    const contentFilters = loadFilters(STORAGE_KEYS.contentFilters);
-    const authorFilters = loadFilters(STORAGE_KEYS.authorFilters);
+    // 首页只显示拉黑按钮，保持原有行为，不执行内容和作者折叠过滤
+    if (!window.location.pathname.startsWith("/home")) {
+      const contentFilters = loadFilters(STORAGE_KEYS.contentFilters);
+      const authorFilters = loadFilters(STORAGE_KEYS.authorFilters);
 
-    const tweetText = extractTweetText(tweetEl);
-    const authorHandle = extractAuthorHandle(tweetEl);
-    const authorDisplayName = extractAuthorDisplayName(tweetEl);
+      const tweetText = extractTweetText(tweetEl);
+      const authorHandle = extractAuthorHandle(tweetEl);
+      const authorDisplayName = extractAuthorDisplayName(tweetEl);
 
-    // 检查内容过滤
-    const contentMatch = matchesFilter(tweetText, contentFilters);
-    if (contentMatch) {
-      collapseTweet(tweetEl, "内容规则", contentMatch);
-      return;
-    }
+      // 检查内容过滤
+      const contentMatch = matchesFilter(tweetText, contentFilters);
+      if (contentMatch) {
+        collapseTweet(tweetEl, "内容规则", contentMatch);
+        return;
+      }
 
-    // 检查作者过滤（同时匹配 handle 和 显示名称）
-    const authorMatch =
-      matchesFilter(authorHandle, authorFilters) || matchesFilter(authorDisplayName, authorFilters);
-    if (authorMatch) {
-      collapseTweet(tweetEl, "作者规则", authorMatch);
-      return;
+      // 检查作者过滤（同时匹配 handle 和 显示名称）
+      const authorMatch =
+        matchesFilter(authorHandle, authorFilters) ||
+        matchesFilter(authorDisplayName, authorFilters);
+      if (authorMatch) {
+        collapseTweet(tweetEl, "作者规则", authorMatch);
+        return;
+      }
     }
 
     // 未匹配 → 注入拉黑按钮；右上角菜单可能稍后才挂载
