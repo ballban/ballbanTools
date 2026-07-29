@@ -1,12 +1,10 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.0
+// @version      1.0.1
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @match        https://x.com/*
 // @match        https://twitter.com/*
-// @exclude      https://x.com/home*
-// @exclude      https://twitter.com/home*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_addStyle
