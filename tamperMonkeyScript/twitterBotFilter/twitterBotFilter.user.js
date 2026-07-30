@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.3
+// @version      1.0.4
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -1296,8 +1296,6 @@
       // 成功
       blockBtn.innerHTML = "✅";
       blockBtn.classList.remove("tbf-blocking");
-      const handle = extractAuthorHandle(tweetEl);
-      showToast(`✅ 已拉黑 @${handle || "用户"}`);
 
       // 渐隐推文
       tweetEl.style.transition = "opacity 0.5s";
