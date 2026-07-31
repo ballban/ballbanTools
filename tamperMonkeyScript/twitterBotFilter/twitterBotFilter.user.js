@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.4
+// @version      1.0.5
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -610,6 +610,7 @@
       transition: all 0.2s;
       flex-shrink: 0;
       margin-left: 4px;
+      margin-right: 4px;
     }
     .tbf-block-btn:hover {
       background: rgba(244, 33, 46, 0.1);
