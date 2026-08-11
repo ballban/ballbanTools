@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="在浏览器本地生成可复制的 FFmpeg 命令，不上传或读取视频文件。"
+    />
+    <title>FFmpeg Command Builder</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">LOCAL TOOL · NO UPLOAD</p>
+          <h1>FFmpeg Command Builder</h1>
+          <p class="hero-copy">
+            用表单组合画面、编码、音频和输出选项，实时生成适用于 PowerShell、CMD 或 Bash
+            的 FFmpeg 命令。
+          </p>
+        </div>
+        <div class="hero-badge" aria-label="仅在浏览器本地运行">
+          <span class="hero-badge-mark">⌘</span>
+          <span>本地运行<br /><strong>不执行命令</strong></span>
+        </div>
+      </header>
+
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+      <main class="builder-layout">
+        <section class="panel settings-panel" aria-labelledby="settings-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">CONFIGURE</p>
+              <h2 id="settings-heading">参数设置</h2>
+            </div>
+            <span class="panel-note">实时更新</span>
+          </div>
+
+          <form id="builder-form" novalidate>
+            <section class="setting-group" aria-labelledby="input-heading">
+              <div class="group-heading">
+                <div>
+                  <p class="group-index">01</p>
+                  <h3 id="input-heading">输入文件</h3>
+                </div>
+                <span class="group-description">只读取文件名和浏览器提供的基本信息</span>
+              </div>
+
+              <div
+                id="drop-zone"
+                class="drop-zone"
+                tabindex="0"
+                role="button"
+                aria-controls="file-input"
+                aria-label="拖拽视频文件到这里，或按 Enter 选择文件"
+              >
+                <input id="file-input" type="file" accept="video/*" hidden />
+                <span class="drop-icon" aria-hidden="true">⇧</span>
+                <strong>将视频文件拖到这里，或点击选择文件</strong>
+                <span class="drop-help">支持单个文件 · 不会上传或读取文件内容</span>
+                <div id="file-details" class="file-details" hidden>
+                  <strong id="file-name">—</strong>
+                  <span id="file-meta">—</span>
+                </div>
+                <button id="clear-file" class="text-button" type="button" hidden>
+                  清除当前文件
+                </button>
+              </div>
+              <p class="field-error" data-error-for="inputPath"></p>
+
+              <div class="field">
+                <label for="input-path">输入文件（-i）</label>
+                <input
+                  id="input-path"
+                  type="text"
+                  autocomplete="off"
+                  value="input.mp4"
+                  placeholder="拖入文件后自动填入，也可以手动填写路径"
+                />
+                <p class="hint">
+                  浏览器无法自动读取本机绝对路径，如有需要请手动填写。示例：
+                  <code>C:\Videos\holiday video.mp4</code>
+                </p>
+                <p class="hint">
+                  未选择文件时，命令预览使用示例输入 <code>input.mp4</code>，仅用于预览。
+                </p>
+              </div>
+
+              <div class="field">
+                <label for="shell-type">Shell 类型</label>
+                <select id="shell-type">
+                  <option value="powershell">Windows PowerShell（默认）</option>
+                  <option value="cmd">Windows CMD</option>
+                  <option value="bash">Bash / Zsh</option>
+                </select>
+              </div>
+            </section>
+
+            <section class="setting-group" aria-labelledby="video-heading">
+              <div class="group-heading">
+                <div>
+                  <p class="group-index">02</p>
+                  <h3 id="video-heading">画面设置</h3>
+                </div>
+                <span class="group-description">滤镜顺序：旋转 → 裁剪 → 缩放 → FPS</span>
+              </div>
+
+              <div class="field-grid two-columns">
+                <div class="field">
+                  <label for="resolution">分辨率</label>
+                  <select id="resolution">
+                    <option value="original">保持原尺寸</option>
+                    <option value="1920x1080">1920 × 1080</option>
+                    <option value="1280x720">1280 × 720</option>
+                    <option value="854x480">854 × 480</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                </div>
+                <label class="check-field align-end">
+                  <input id="keep-aspect" type="checkbox" checked />
+                  <span>保持比例</span>
+                </label>
+              </div>
+
+              <div id="custom-resolution-fields" class="field-grid two-columns conditional" hidden>
+                <div class="field">
+                  <label for="custom-width">自定义宽度</label>
+                  <input id="custom-width" type="number" min="1" step="1" placeholder="1280" />
+                  <p class="field-error" data-error-for="width"></p>
+                </div>
+                <div class="field">
+                  <label for="custom-height">自定义高度</label>
+                  <input id="custom-height" type="number" min="1" step="1" placeholder="720" />
+                  <p class="field-error" data-error-for="height"></p>
+                </div>
+              </div>
+
+              <div class="field-grid two-columns">
+                <div class="field">
+                  <label for="fps">帧率</label>
+                  <select id="fps">
+                    <option value="original">保持原帧率</option>
+                    <option value="24">24 fps</option>
+                    <option value="25">25 fps</option>
+                    <option value="30">30 fps</option>
+                    <option value="60">60 fps</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                </div>
+                <div id="custom-fps-field" class="field conditional" hidden>
+                  <label for="custom-fps">自定义 FPS</label>
+                  <input id="custom-fps" type="number" min="0.01" max="240" step="0.01" placeholder="30" />
+                  <p class="field-error" data-error-for="fps"></p>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="rotation">旋转</label>
+                <select id="rotation">
+                  <option value="0">不旋转</option>
+                  <option value="90">顺时针 90°</option>
+                  <option value="180">180°</option>
+                  <option value="270">逆时针 90°</option>
+                </select>
+              </div>
+
+              <label class="check-field">
+                <input id="crop-enabled" type="checkbox" />
+                <span>启用裁剪</span>
+              </label>
+              <div id="crop-fields" class="crop-grid conditional" hidden>
+                <div class="field">
+                  <label for="crop-width">宽度</label>
+                  <input id="crop-width" type="number" min="1" step="1" placeholder="1280" />
+                  <p class="field-error" data-error-for="cropWidth"></p>
+                </div>
+                <div class="field">
+                  <label for="crop-height">高度</label>
+                  <input id="crop-height" type="number" min="1" step="1" placeholder="720" />
+                  <p class="field-error" data-error-for="cropHeight"></p>
+                </div>
+                <div class="field">
+                  <label for="crop-x">X</label>
+                  <input id="crop-x" type="number" min="0" step="1" placeholder="0" />
+                  <p class="field-error" data-error-for="cropX"></p>
+                </div>
+                <div class="field">
+                  <label for="crop-y">Y</label>
+                  <input id="crop-y" type="number" min="0" step="1" placeholder="0" />
+                  <p class="field-error" data-error-for="cropY"></p>
+                </div>
+              </div>
+            </section>
+
+            <section class="setting-group" aria-labelledby="video-codec-heading">
+              <div class="group-heading">
+                <div>
+                  <p class="group-index">03</p>
+                  <h3 id="video-codec-heading">视频编码</h3>
+                </div>
+                <span class="group-description">滤镜启用时不能使用 copy</span>
+              </div>
+
+              <div class="field">
+                <label for="video-codec">视频编码器</label>
+                <select id="video-codec">
+                  <option value="copy">保持原视频（copy）</option>
+                  <option value="libx264">H.264（libx264）</option>
+                  <option value="libx265">H.265（libx265）</option>
+                  <option value="libvpx-vp9">VP9（libvpx-vp9）</option>
+                  <option value="h264_amf">AMD H.264（h264_amf）</option>
+                </select>
+                <p class="field-error" data-error-for="videoCodec"></p>
+              </div>
+
+              <div id="video-quality-fields" class="field-grid two-columns">
+                <div class="field">
+                  <label for="crf">
+                    <span id="quality-label">CRF</span>
+                    <span id="quality-range" class="label-note">0–51</span>
+                  </label>
+                  <input id="crf" type="number" min="0" max="51" step="1" value="23" />
+                  <p class="field-error" data-error-for="crf"></p>
+                </div>
+                <div class="field">
+                  <label id="preset-label" for="preset">编码速度 preset</label>
+                  <select id="preset">
+                    <option value="ultrafast">ultrafast</option>
+                    <option value="superfast">superfast</option>
+                    <option value="veryfast">veryfast</option>
+                    <option value="faster">faster</option>
+                    <option value="fast">fast</option>
+                    <option value="medium" selected>medium</option>
+                    <option value="slow">slow</option>
+                    <option value="slower">slower</option>
+                    <option value="veryslow">veryslow</option>
+                  </select>
+                  <p class="field-error" data-error-for="preset"></p>
+                </div>
+              </div>
+            </section>
+
+            <section class="setting-group" aria-labelledby="audio-heading">
+              <div class="group-heading">
+                <div>
+                  <p class="group-index">04</p>
+                  <h3 id="audio-heading">音频编码</h3>
+                </div>
+                <span class="group-description">copy 和 -an 不需要音频码率</span>
+              </div>
+
+              <div class="field-grid two-columns">
+                <div class="field">
+                  <label for="audio-codec">音频编码器</label>
+                  <select id="audio-codec">
+                    <option value="copy">保持原音频（copy）</option>
+                    <option value="aac">AAC（aac）</option>
+                    <option value="libopus">Opus（libopus）</option>
+                    <option value="libmp3lame">MP3（libmp3lame）</option>
+                    <option value="none">删除音频（-an）</option>
+                  </select>
+                  <p class="field-error" data-error-for="audioCodec"></p>
+                </div>
+                <div class="field">
+                  <label for="audio-bitrate">音频码率</label>
+                  <select id="audio-bitrate">
+                    <option value="none">—</option>
+                    <option value="96k">96k</option>
+                    <option value="128k" selected>128k</option>
+                    <option value="192k">192k</option>
+                    <option value="256k">256k</option>
+                    <option value="320k">320k</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                  <p class="field-error" data-error-for="audioBitrate"></p>
+                </div>
+              </div>
+              <div id="custom-audio-bitrate-field" class="field conditional" hidden>
+                <label for="custom-audio-bitrate">自定义音频码率</label>
+                <input id="custom-audio-bitrate" type="text" placeholder="例如 160k" />
+              </div>
+            </section>
+
+            <section class="setting-group" aria-labelledby="output-heading">
+              <div class="group-heading">
+                <div>
+                  <p class="group-index">05</p>
+                  <h3 id="output-heading">输出设置</h3>
+                </div>
+                <span class="group-description">默认不会覆盖已有文件</span>
+              </div>
+
+              <div class="field">
+                <label for="output-container">输出容器</label>
+                <select id="output-container">
+                  <option value="auto">自动保持输入扩展名</option>
+                  <option value="mp4">MP4</option>
+                  <option value="mkv">MKV</option>
+                  <option value="webm">WebM</option>
+                  <option value="mov">MOV</option>
+                </select>
+              </div>
+
+              <label id="fast-start-field" class="check-field">
+                <input id="fast-start" type="checkbox" />
+                <span>启用 Web 优化（-movflags +faststart）</span>
+              </label>
+              <label class="check-field">
+                <input id="overwrite" type="checkbox" />
+                <span>覆盖已有文件（-y）</span>
+              </label>
+              <p class="field-error" data-error-for="fastStart"></p>
+
+              <label class="check-field">
+                <input id="manual-output" type="checkbox" />
+                <span>手动编辑输出文件名</span>
+              </label>
+              <div class="field">
+                <label for="manual-output-name">输出文件名</label>
+                <input id="manual-output-name" type="text" readonly />
+                <p id="manual-output-warning" class="warning-text" hidden>
+                  当前输出文件名已脱离自动命名规则。
+                </p>
+                <p class="field-error" data-error-for="manualOutputName"></p>
+              </div>
+            </section>
+          </form>
+        </section>
+
+        <aside class="panel result-panel" aria-labelledby="result-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">PREVIEW</p>
+              <h2 id="result-heading">命令预览</h2>
+            </div>
+            <span id="command-shell" class="shell-pill">PowerShell</span>
+          </div>
+
+          <div id="validation-banner" class="validation-banner" hidden>
+            <strong>请修正以下问题</strong>
+            <ul id="validation-list"></ul>
+          </div>
+
+          <div class="output-card">
+            <span class="result-label">输入 -i</span>
+            <code id="input-preview">—</code>
+          </div>
+          <div class="output-card">
+            <span class="result-label">自动输出文件名</span>
+            <code id="output-name-preview">—</code>
+          </div>
+
+          <div class="command-card">
+            <div class="command-card-heading">
+              <span class="result-label">完整 FFmpeg 命令</span>
+              <span class="command-language">shell command</span>
+            </div>
+            <pre id="command-preview" tabindex="0"><code>ffmpeg -i 'input.mp4' -c:v copy -c:a copy 'input_output.mp4'</code></pre>
+            <div class="command-actions">
+              <button id="copy-command" class="primary-button" type="button" disabled>
+                复制命令
+              </button>
+              <button id="download-command" class="secondary-button" type="button" disabled>
+                下载 .txt
+              </button>
+              <span id="copy-status" class="copy-status" role="status" aria-live="polite"></span>
+            </div>
+          </div>
+
+          <div class="summary-card">
+            <div class="command-card-heading">
+              <span class="result-label">参数摘要</span>
+              <span class="command-language">live state</span>
+            </div>
+            <ul id="summary-list" class="summary-list">
+              <li>尚未选择输入文件</li>
+            </ul>
+          </div>
+
+          <div class="privacy-card">
+            <strong>浏览器边界</strong>
+            <p>
+              拖拽操作只会读取 <code>File.name</code>、大小和 MIME 类型。页面不会读取视频二进制、
+              上传文件、调用系统 Shell 或实际运行 FFmpeg。
+            </p>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="footer-note">
+        纯静态网页 · 所有计算在浏览器本地完成 · 命令仅供复制和检查
+      </footer>
+    </div>
+
+    <noscript>
+      <div class="noscript-message">此页面需要启用 JavaScript 才能生成命令。</div>
+    </noscript>
+    <script src="./command-builder.js?v=20260811-4"></script>
+    <script src="./app.js?v=20260811-4"></script>
+  </body>
+</html>
