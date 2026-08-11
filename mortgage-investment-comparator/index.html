@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="比较买房后房屋净资产与投资账户余额的月度模拟器。"
+    />
+    <title>房贷 vs 投资模拟器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">ASSET PATH COMPARISON</p>
+          <h1>房贷 vs 投资模拟器</h1>
+          <p class="hero-copy">
+            用月度模拟比较：买房后的房屋净资产，和租房同时把可节省的资金投入投资账户后的余额。
+          </p>
+        </div>
+        <div class="hero-mark" aria-hidden="true">
+          <span class="hero-mark-house"></span>
+          <span class="hero-mark-chart"></span>
+        </div>
+      </header>
+
+      <section class="notice" aria-label="使用说明">
+        <strong>先看口径：</strong>
+        这是资产路径比较，不包含居住使用价值；租房 + 投资路径会扣除当前月租，并按年租金增长率逐月变化。土地增长率、建筑物折旧和投资收益率都只是模拟假设，不构成投资、贷款或购房建议。
+      </section>
+
+      <section class="profile-panel" aria-labelledby="profile-heading">
+        <div class="profile-heading">
+          <div>
+            <p class="section-kicker">QUICK PROFILES</p>
+            <h2 id="profile-heading">房屋画像</h2>
+          </div>
+          <p>切换会更新房价、土地增长率、建筑物参数、持有成本和租房参数，不会覆盖投资收益率与模拟期限。</p>
+        </div>
+        <div class="profile-buttons">
+          <button class="profile-button active" type="button" data-profile-id="metro-used-condo">
+            <strong>首都圈普通中古公寓</strong>
+            <small>约 ¥5,200 万 · 月租 ¥12 万</small>
+          </button>
+          <button class="profile-button" type="button" data-profile-id="metro-used-house">
+            <strong>首都圈普通中古一户建</strong>
+            <small>约 ¥4,200 万 · 月租 ¥17 万</small>
+          </button>
+          <button class="profile-button" type="button" data-profile-id="metro-new-home">
+            <strong>首都圈全新普通一户建 / 公寓</strong>
+            <small>约 ¥6,000 万 · 月租 ¥18 万</small>
+          </button>
+          <button class="profile-button" type="button" data-profile-id="outer-suburban-house">
+            <strong>远离市中心普通一户建 / 中古一户建</strong>
+            <small>约 ¥2,800 万 · 月租 ¥9 万</small>
+          </button>
+        </div>
+      </section>
+
+      <form id="simulator-form" class="simulator-form" novalidate>
+        <div class="comparison-grid">
+          <section class="comparison-part comparison-part-buy">
+            <div class="comparison-part-heading">
+              <div>
+                <p class="section-kicker">PART 1</p>
+                <h2>买房路径</h2>
+              </div>
+              <p>01 房屋与贷款 + 02 房价与持有成本</p>
+            </div>
+            <div class="part-panels">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">01</p>
+                <h2>房屋与贷款</h2>
+              </div>
+              <span class="panel-icon" aria-hidden="true">⌂</span>
+            </div>
+
+            <div class="field-grid two-columns">
+              <div class="field">
+                <label for="currency">货币</label>
+                <select id="currency">
+                  <option value="JPY">JPY（日元）</option>
+                  <option value="USD">USD（美元）</option>
+                  <option value="EUR">EUR（欧元）</option>
+                </select>
+                <p class="field-error" id="error-currency"></p>
+              </div>
+
+              <div class="field">
+                <label for="housePrice">房屋价格</label>
+                <div class="range-control">
+                  <input id="housePrice" type="range" min="1000000" max="100000000" step="1000000" value="52000000" />
+                  <output id="housePrice-output">¥52,000,000</output>
+                </div>
+                <p class="field-hint">每格移动 1,000,000，上限 1 亿。</p>
+                <p class="field-error" id="error-housePrice"></p>
+              </div>
+
+              <div class="field">
+                <label for="downPaymentMode">头金方式</label>
+                <select id="downPaymentMode">
+                  <option value="percentage">按百分比</option>
+                  <option value="fixed">固定金额</option>
+                </select>
+                <p class="field-error" id="error-downPaymentMode"></p>
+              </div>
+
+              <div class="field" id="percentage-field">
+                <label for="downPaymentPercentage">头金比例</label>
+                <div class="range-control">
+                  <input id="downPaymentPercentage" type="range" min="0" max="50" step="1" value="20" />
+                  <output id="downPaymentPercentage-output">20%</output>
+                </div>
+                <p class="field-hint">范围 0% 到 50%。</p>
+                <p class="field-error" id="error-downPaymentPercentage"></p>
+              </div>
+
+              <div class="field hidden" id="fixed-field">
+                <label for="downPaymentAmount">头金金额</label>
+                <div class="range-control">
+                  <input id="downPaymentAmount" type="range" min="0" max="500000000" step="1000000" value="10000000" disabled />
+                  <output id="downPaymentAmount-output">¥10,000,000</output>
+                </div>
+                <p class="field-error" id="error-downPaymentAmount"></p>
+              </div>
+
+              <div class="field">
+                <label for="mortgageAnnualRate">
+                  房贷年利率
+                  <span class="help" title="按常见名义年利率处理：月利率 = 年利率 ÷ 12。">?</span>
+                </label>
+                <div class="range-control">
+                  <input id="mortgageAnnualRate" type="range" min="0" max="10" step="0.1" value="1" />
+                  <output id="mortgageAnnualRate-output">1.0%</output>
+                </div>
+                <p class="field-error" id="error-mortgageAnnualRate"></p>
+              </div>
+
+              <div class="field">
+                <label for="loanTermYears">贷款期限</label>
+                <div class="range-control">
+                  <input id="loanTermYears" type="range" min="1" max="40" step="1" value="35" />
+                  <output id="loanTermYears-output">35 年</output>
+                </div>
+                <p class="field-error" id="error-loanTermYears"></p>
+              </div>
+
+              <div class="field">
+                <label for="horizonYears">模拟期限</label>
+                <div class="range-control">
+                  <input id="horizonYears" type="range" min="1" max="40" step="1" value="20" />
+                  <output id="horizonYears-output">20 年</output>
+                </div>
+                <p class="field-error" id="error-horizonYears"></p>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">02</p>
+                <h2>土地、建筑物与持有成本</h2>
+              </div>
+              <span class="panel-icon" aria-hidden="true">↗</span>
+            </div>
+
+            <div class="field-grid two-columns">
+              <div class="field">
+                <label for="landAnnualGrowthRate">土地年增长率</label>
+                <div class="range-control">
+                  <input id="landAnnualGrowthRate" type="range" min="-20" max="20" step="0.1" value="2" />
+                  <output id="landAnnualGrowthRate-output">2.0%</output>
+                </div>
+                <p class="field-hint">只作用于土地；建筑物按结构和购买时年龄折旧。</p>
+                <p class="field-error" id="error-landAnnualGrowthRate"></p>
+              </div>
+
+              <div class="field">
+                <label for="buildingStructure">建筑物结构</label>
+                <select id="buildingStructure">
+                  <option value="wood">木造住宅（税务基准 22 年）</option>
+                  <option value="rc">RC 住宅（税务基准 47 年）</option>
+                </select>
+                <p class="field-hint">税务年限是折旧基准，不等于实际售价。</p>
+                <p class="field-error" id="error-buildingStructure"></p>
+              </div>
+
+              <div class="field">
+                <label for="buildingAgeYears">购买时建筑年龄</label>
+                <div class="range-control">
+                  <input id="buildingAgeYears" type="range" min="0" max="60" step="1" value="15" />
+                  <output id="buildingAgeYears-output">15 年</output>
+                </div>
+                <p class="field-error" id="error-buildingAgeYears"></p>
+              </div>
+
+              <div class="field">
+                <label for="landSharePercentage">土地占房价比例</label>
+                <div class="range-control">
+                  <input id="landSharePercentage" type="range" min="0" max="100" step="1" value="35" />
+                  <output id="landSharePercentage-output">35.0%</output>
+                </div>
+                <p class="field-hint">房屋价格会拆成土地和建筑物两部分。</p>
+                <p class="field-error" id="error-landSharePercentage"></p>
+              </div>
+
+              <div class="field">
+                <label for="sellingFeeRate">出售费用比例</label>
+                <div class="range-control">
+                  <input id="sellingFeeRate" type="range" min="0" max="20" step="0.1" value="3" />
+                  <output id="sellingFeeRate-output">3.0%</output>
+                </div>
+                <p class="field-error" id="error-sellingFeeRate"></p>
+              </div>
+
+              <div class="field">
+                <label for="purchaseFeeRate">购房费用比例</label>
+                <div class="range-control">
+                  <input id="purchaseFeeRate" type="range" min="0" max="20" step="0.1" value="0" />
+                  <output id="purchaseFeeRate-output">0.0%</output>
+                </div>
+                <p class="field-error" id="error-purchaseFeeRate"></p>
+              </div>
+
+              <div class="field">
+                <label for="purchaseFeeFixed">固定购房费用</label>
+                <div class="range-control">
+                  <input id="purchaseFeeFixed" type="range" min="0" max="50000000" step="100000" value="0" />
+                  <output id="purchaseFeeFixed-output">¥0</output>
+                </div>
+                <p class="field-error" id="error-purchaseFeeFixed"></p>
+              </div>
+
+              <div class="field field-wide">
+                <label for="monthlyOwnerCost">每月持有成本</label>
+                <div class="range-control">
+                  <input id="monthlyOwnerCost" type="range" min="0" max="200000" step="1000" value="37000" />
+                  <output id="monthlyOwnerCost-output">¥37,000 / 月</output>
+                </div>
+                <p class="field-hint">可包含管理费、保险、固定资产税等，最大 200,000 / 月。</p>
+                <p class="field-error" id="error-monthlyOwnerCost"></p>
+              </div>
+            </div>
+          </section>
+
+          </div>
+        </section>
+        <section class="comparison-part comparison-part-rent">
+          <div class="comparison-part-heading">
+            <div>
+              <p class="section-kicker">PART 2</p>
+              <h2>租房 + 投资路径</h2>
+            </div>
+            <p>03 投资假设 + 04 租房成本</p>
+          </div>
+          <div class="part-panels">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">03</p>
+                <h2>投资假设</h2>
+              </div>
+              <span class="panel-icon" aria-hidden="true">◒</span>
+            </div>
+
+            <div class="field-grid two-columns">
+              <div class="field">
+                <label for="investmentAnnualReturnRate">年化投资收益率</label>
+                <div class="range-control">
+                  <input id="investmentAnnualReturnRate" type="range" min="-20" max="20" step="0.1" value="5" />
+                  <output id="investmentAnnualReturnRate-output">5.0%</output>
+                </div>
+                <p class="field-hint">按有效年化收益率换算为月复利。</p>
+                <p class="field-error" id="error-investmentAnnualReturnRate"></p>
+              </div>
+
+              <div class="field">
+                <label for="monthlyContributionBasis">每月投入基准</label>
+                <select id="monthlyContributionBasis">
+                  <option value="mortgage-plus-owner-cost">房贷月供 + 持有成本 − 月租（推荐）</option>
+                  <option value="mortgage-only">房贷月供 − 月租</option>
+                  <option value="custom">自定义净投入（不自动扣租金）</option>
+                </select>
+                <p class="field-error" id="error-monthlyContributionBasis"></p>
+              </div>
+
+              <div class="field hidden" id="custom-contribution-field">
+                <label for="customMonthlyContribution">自定义月投入</label>
+                <div class="range-control">
+                  <input id="customMonthlyContribution" type="range" min="0" max="3000000" step="1000" value="0" disabled />
+                  <output id="customMonthlyContribution-output">¥0 / 月</output>
+                </div>
+                <p class="field-error" id="error-customMonthlyContribution"></p>
+              </div>
+
+              <div class="field">
+                <label for="investmentTiming">每月投入时点</label>
+                <select id="investmentTiming" disabled>
+                  <option value="month-end">月末（MVP 固定）</option>
+                </select>
+                <p class="field-hint">投资按月末投入计算。</p>
+              </div>
+
+              <p class="field-hint field-wide">
+                投资路径的启动金自动等于买房初期费用（头金 + 购房费用）。
+              </p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">04</p>
+                <h2>租房成本</h2>
+              </div>
+              <span class="panel-icon" aria-hidden="true">¥</span>
+            </div>
+
+            <div class="field-grid two-columns">
+              <div class="field">
+                <label for="monthlyRent">当前月租</label>
+                <div class="range-control">
+                  <input id="monthlyRent" type="range" min="0" max="200000" step="1000" value="120000" />
+                  <output id="monthlyRent-output">¥120,000 / 月</output>
+                </div>
+                <p class="field-error" id="error-monthlyRent"></p>
+              </div>
+
+              <div class="field">
+                <label for="rentAnnualGrowthRate">年租金增长率</label>
+                <div class="range-control">
+                  <input id="rentAnnualGrowthRate" type="range" min="-100" max="20" step="0.1" value="2" />
+                  <output id="rentAnnualGrowthRate-output">2.0%</output>
+                </div>
+                <p class="field-hint">允许输入负数，用于模拟租金下降。</p>
+                <p class="field-error" id="error-rentAnnualGrowthRate"></p>
+              </div>
+
+              <p class="field-hint field-wide rent-model-hint">
+                租房 + 投资路径的每月净投入 = 买房月度成本 − 当月租金。若结果为负数，代表租金高于买房月度成本，会从投资账户提取差额。
+              </p>
+            </div>
+          </section>
+        </div>
+        </section>
+      </div>
+
+        <div class="form-actions">
+          <div class="action-buttons">
+            <button class="button button-primary" type="submit">重新计算</button>
+            <button class="button button-secondary" id="reset-button" type="button">恢复默认值</button>
+            <button class="button button-secondary" id="copy-button" type="button">复制当前参数</button>
+            <button class="button button-secondary" id="export-button" type="button">导出 CSV</button>
+          </div>
+          <p id="form-status" class="form-status" role="status">结果会随输入实时更新，参数会自动保存在本浏览器。</p>
+        </div>
+      </form>
+
+      <section class="results-section" aria-live="polite">
+        <div class="section-title-row">
+          <div>
+            <p class="section-kicker">RESULTS</p>
+            <h2>模拟结果</h2>
+          </div>
+          <p class="result-caption">买房净资产 vs 租房 + 投资账户余额</p>
+        </div>
+
+        <div class="result-groups">
+          <section class="result-group result-group-buy" aria-labelledby="buy-result-heading">
+            <div class="result-group-heading">
+              <div>
+                <p class="section-kicker">PART 1</p>
+                <h3 id="buy-result-heading">买房</h3>
+              </div>
+              <p>从购房初期支出，到每月还款，再到期末房屋净资产。</p>
+            </div>
+            <div class="summary-grid">
+              <article class="summary-card">
+                <span class="summary-label">初期费用合计</span>
+                <strong class="summary-value" id="summary-initial-expenses">—</strong>
+                <small>
+                  头金 <span id="summary-down-payment">—</span>
+                  + 购房费用 <span id="summary-purchase-fees">—</span>
+                </small>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">每月买房总成本</span>
+                <strong class="summary-value" id="summary-monthly-buy-cost">—</strong>
+                <small>
+                  房贷还款 <span id="summary-monthly-payment">—</span>
+                  + 持有成本 <span id="summary-monthly-owner-cost">—</span>
+                </small>
+              </article>
+              <article class="summary-card summary-card-house">
+                <span class="summary-label">期末房屋净资产</span>
+                <strong class="summary-value" id="summary-home-equity">—</strong>
+                <small>
+                  土地 <span id="summary-final-land-value">—</span>
+                  + 建筑物 <span id="summary-final-building-value">—</span>
+                  = 房屋价值 <span id="summary-house-value">—</span>
+                </small>
+                <small>
+                  房屋价值 − 剩余贷款 <span id="summary-final-loan">—</span>
+                  − 出售费用 <span id="summary-final-selling-cost">—</span>
+                </small>
+              </article>
+            </div>
+          </section>
+
+          <section class="result-group result-group-investment" aria-labelledby="investment-result-heading">
+            <div class="result-group-heading">
+              <div>
+                <p class="section-kicker">PART 2</p>
+                <h3 id="investment-result-heading">投资</h3>
+              </div>
+              <p>买房初期费用作为投资启动金，之后投入买房成本与房租的月度差额。</p>
+            </div>
+            <div class="summary-grid">
+              <article class="summary-card">
+                <span class="summary-label">初期费用（投资启动金）</span>
+                <strong class="summary-value" id="summary-initial-investment">—</strong>
+                <small>买房初期费用 = 头金 + 购房费用</small>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">月度投资金额（首月 → 期末）</span>
+                <strong class="summary-value" id="summary-investment-contribution-range">—</strong>
+                <small id="summary-investment-contribution-breakdown">—</small>
+              </article>
+              <article class="summary-card summary-card-investment">
+                <span class="summary-label">投资账户期末价值</span>
+                <strong class="summary-value" id="summary-investment-balance">—</strong>
+                <small>初始投入 + 月度复利投入</small>
+              </article>
+            </div>
+          </section>
+
+          <section class="result-group result-group-compare" aria-labelledby="compare-result-heading">
+            <div class="result-group-heading">
+              <div>
+                <p class="section-kicker">PART 3</p>
+                <h3 id="compare-result-heading">比较</h3>
+              </div>
+              <p>集中查看两条资产路径的最终差额、累计现金流和收益构成。</p>
+            </div>
+            <div class="summary-grid">
+              <article class="summary-card">
+                <span class="summary-label">模拟期限</span>
+                <strong class="summary-value" id="summary-horizon">—</strong>
+              </article>
+              <article class="summary-card summary-card-difference">
+                <span class="summary-label">两者差额</span>
+                <strong class="summary-value" id="summary-difference">—</strong>
+              </article>
+              <article class="summary-card summary-card-winner">
+                <span class="summary-label">金融资产较高的路径</span>
+                <strong class="summary-value" id="summary-winner">—</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">买房累计现金流出</span>
+                <strong class="summary-value" id="summary-total-buy-outflow">—</strong>
+                <small>含头金、购房费用、月供与持有成本</small>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">累计租金支出</span>
+                <strong class="summary-value" id="summary-total-rent">—</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">投资累计净投入</span>
+                <strong class="summary-value" id="summary-total-investment">—</strong>
+                <small>负数代表从投资账户提取</small>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">累计房贷还款</span>
+                <strong class="summary-value" id="summary-total-mortgage-paid">—</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">其中累计利息</span>
+                <strong class="summary-value" id="summary-total-interest-paid">—</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">累计偿还本金</span>
+                <strong class="summary-value" id="summary-total-principal-paid">—</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">房屋价值变化</span>
+                <strong class="summary-value" id="summary-house-appreciation">—</strong>
+                <small>期末土地 + 建筑物价值 − 买入价格</small>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">投资收益</span>
+                <strong class="summary-value" id="summary-investment-gain">—</strong>
+                <small>期末账户价值 − 累计净投入</small>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel chart-panel">
+          <div class="section-title-row compact">
+            <div>
+              <h3>资产路径曲线</h3>
+              <p class="panel-subtitle">鼠标悬停或聚焦数据点查看当月明细。</p>
+            </div>
+            <div class="legend" aria-label="图表图例">
+              <span><i class="legend-dot house"></i>房屋净资产</span>
+              <span><i class="legend-dot investment"></i>投资账户余额</span>
+            </div>
+          </div>
+          <div class="chart-frame" id="chart-frame">
+            <svg id="comparison-chart" role="img" aria-label="资产路径比较折线图"></svg>
+            <div id="chart-tooltip" class="chart-tooltip" hidden></div>
+          </div>
+        </section>
+
+        <section class="panel detail-panel">
+          <div class="section-title-row compact">
+            <div>
+              <h3>月度明细</h3>
+              <p class="panel-subtitle">最终资产值和差额可以追溯到最后一条月度记录。</p>
+            </div>
+            <label class="table-switch">
+              <span>显示粒度</span>
+              <select id="table-range">
+                <option value="yearly">按年度</option>
+                <option value="monthly">按月度</option>
+              </select>
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>年 / 月</th>
+                  <th>房屋价值</th>
+                  <th>土地价值</th>
+                  <th>建筑物价值</th>
+                  <th>剩余贷款</th>
+                  <th>房屋净资产</th>
+                  <th>投资余额</th>
+                  <th>当月租金</th>
+                  <th>投资净投入</th>
+                  <th>差额</th>
+                </tr>
+              </thead>
+              <tbody id="detail-table-body">
+                <tr>
+                  <td class="table-empty" colspan="10">输入有效参数后显示月度明细</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <footer class="footer-note">
+        <strong>模型边界：</strong>
+        当前 MVP 不包含浮动利率、提前还款、税金详细计算、汇率和投资收益波动。房屋价值按土地与建筑物拆分，建筑物折旧使用木造 22 年、RC 47 年的税务耐用年数作为简化基准，不等同于实际成交价。租房 + 投资路径暂不包含押金、中介费等一次性租房费用。
+      </footer>
+    </main>
+
+    <script src="./calculator.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
