@@ -20,8 +20,7 @@
     buildingStructure: 'rc',
     buildingAgeYears: 15,
     landSharePercentage: 35,
-    purchaseFeeRate: 0,
-    purchaseFeeFixed: 0,
+    purchaseFeeRate: 8,
     sellingFeeRate: 3,
     monthlyOwnerCost: 37000,
     investmentAnnualReturnRate: 5,
@@ -171,10 +170,6 @@
       errors.purchaseFeeRate = '购房费用比例必须在 0% 到 100% 之间。';
     }
 
-    if (!isFiniteNumber(input.purchaseFeeFixed) || input.purchaseFeeFixed < 0) {
-      errors.purchaseFeeFixed = '固定购房费用不能为负数。';
-    }
-
     if (
       !isFiniteNumber(input.sellingFeeRate) ||
       input.sellingFeeRate < 0 ||
@@ -280,9 +275,7 @@
     var initialLandValue =
       (input.housePrice * input.landSharePercentage) / 100;
     var initialBuildingValue = input.housePrice - initialLandValue;
-    var purchaseFees =
-      (input.housePrice * input.purchaseFeeRate) / 100 +
-      input.purchaseFeeFixed;
+    var purchaseFees = (input.housePrice * input.purchaseFeeRate) / 100;
     var monthlyPayment = calculateMonthlyPayment(
       loanPrincipal,
       input.mortgageAnnualRate,

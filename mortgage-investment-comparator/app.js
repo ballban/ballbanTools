@@ -20,7 +20,6 @@
     buildingAgeYears: 'error-buildingAgeYears',
     landSharePercentage: 'error-landSharePercentage',
     purchaseFeeRate: 'error-purchaseFeeRate',
-    purchaseFeeFixed: 'error-purchaseFeeFixed',
     sellingFeeRate: 'error-sellingFeeRate',
     monthlyOwnerCost: 'error-monthlyOwnerCost',
     monthlyRent: 'error-monthlyRent',
@@ -80,7 +79,8 @@
   };
 
   var currentResult = null;
-  var storageKey = 'mortgage-investment-comparator-input-v1';
+  var storageKey = 'mortgage-investment-comparator-input-v2';
+  var legacyStorageKey = 'mortgage-investment-comparator-input-v1';
   var selectedProfileId = 'metro-used-condo';
   var persistedFieldIds = [
     'currency',
@@ -96,7 +96,6 @@
     'buildingAgeYears',
     'landSharePercentage',
     'purchaseFeeRate',
-    'purchaseFeeFixed',
     'sellingFeeRate',
     'monthlyOwnerCost',
     'monthlyRent',
@@ -139,11 +138,19 @@
   function restoreInputState() {
     try {
       var saved = window.localStorage.getItem(storageKey);
+      var loadedFromLegacy = false;
+      if (!saved) {
+        saved = window.localStorage.getItem(legacyStorageKey);
+        loadedFromLegacy = Boolean(saved);
+      }
       if (!saved) {
         return;
       }
 
       var state = JSON.parse(saved);
+      if (loadedFromLegacy && state.purchaseFeeRate === '0') {
+        state.purchaseFeeRate = String(calculator.defaultInput.purchaseFeeRate);
+      }
       selectedProfileId =
         state.profileId && propertyProfiles[state.profileId]
           ? state.profileId
@@ -177,6 +184,9 @@
           element.value = state[id];
         }
       });
+      if (loadedFromLegacy) {
+        window.localStorage.setItem(storageKey, JSON.stringify(state));
+      }
     } catch (error) {
       console.warn('无法读取浏览器中保存的参数，已使用默认值。', error);
     }
@@ -185,6 +195,7 @@
   function clearInputState() {
     try {
       window.localStorage.removeItem(storageKey);
+      window.localStorage.removeItem(legacyStorageKey);
     } catch (error) {
       console.warn('无法清除浏览器中保存的参数。', error);
     }
@@ -240,7 +251,6 @@
       'buildingAgeYears',
       'landSharePercentage',
       'purchaseFeeRate',
-      'purchaseFeeFixed',
       'sellingFeeRate',
       'monthlyOwnerCost',
       'monthlyRent',
@@ -267,7 +277,6 @@
       buildingAgeYears: readNumber('buildingAgeYears'),
       landSharePercentage: readNumber('landSharePercentage'),
       purchaseFeeRate: readNumber('purchaseFeeRate'),
-      purchaseFeeFixed: readNumber('purchaseFeeFixed'),
       sellingFeeRate: readNumber('sellingFeeRate'),
       monthlyOwnerCost: readNumber('monthlyOwnerCost'),
       monthlyRent: readNumber('monthlyRent'),
@@ -360,10 +369,6 @@
     );
     setText('sellingFeeRate-output', formatRate(input.sellingFeeRate));
     setText('purchaseFeeRate-output', formatRate(input.purchaseFeeRate));
-    setText(
-      'purchaseFeeFixed-output',
-      formatMoney(input.purchaseFeeFixed, input.currency),
-    );
     setText(
       'monthlyOwnerCost-output',
       formatMoney(input.monthlyOwnerCost, input.currency) + ' / 月',
@@ -1008,7 +1013,6 @@
       '购买时建筑年龄: ' + input.buildingAgeYears + ' 年',
       '土地占比: ' + input.landSharePercentage + '%',
       '购房费用比例: ' + input.purchaseFeeRate + '%',
-      '固定购房费用: ' + input.purchaseFeeFixed,
       '出售费用比例: ' + input.sellingFeeRate + '%',
       '每月持有成本: ' + input.monthlyOwnerCost,
       '当前月租: ' + input.monthlyRent,
