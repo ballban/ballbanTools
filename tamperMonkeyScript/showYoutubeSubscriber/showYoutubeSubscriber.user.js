@@ -3,6 +3,8 @@
 // @namespace    https://github.com/ballban/ballbanTools
 // @version      1.0.0
 // @description  Modify the subscriber text on YouTube video pages
+// @author       ballban
+// @icon         https://www.youtube.com/favicon.ico
 // @match        https://www.youtube.com/watch*
 // @run-at       document-idle
 // @noframes

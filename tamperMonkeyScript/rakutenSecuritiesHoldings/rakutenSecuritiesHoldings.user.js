@@ -3,6 +3,8 @@
 // @namespace    https://github.com/ballban/ballbanTools
 // @version      1.6.0
 // @description  楽天証券の国内株式保有商品一覧に、変化率・変動額・評価損益金額・評価損益率を表示します
+// @author       ballban
+// @icon         https://www.rakuten-sec.co.jp/favicon.ico
 // @match        https://*.rakuten-sec.co.jp/app/ass_jp_stk_possess_lst.do*
 // @run-at       document-idle
 // @grant        none

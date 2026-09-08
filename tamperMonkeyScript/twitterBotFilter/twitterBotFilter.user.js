@@ -3,6 +3,8 @@
 // @namespace    https://github.com/ballban/ballbanTools
 // @version      1.0.5
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
+// @author       ballban
+// @icon         https://abs.twimg.com/favicons/twitter.3.ico
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @grant        GM_getValue
