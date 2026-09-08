@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Show YouTube Subscriber
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.1
+// @version      1.0.2
 // @description  Modify the subscriber text on YouTube video pages
 // @author       ballban
 // @icon         https://www.youtube.com/favicon.ico
-// @match        https://www.youtube.com/watch*
+// @match        https://www.youtube.com/*
 // @run-at       document-idle
 // @noframes
-// @grant        none
+// @grant        window.onurlchange
 // ==/UserScript==
 
 (function () {
@@ -17,6 +17,10 @@
   const lastWrittenText = new WeakMap();
 
   function updateSubscriberText() {
+    if (window.location.pathname !== '/watch') {
+      return;
+    }
+
     const element = document.getElementById('owner-sub-count');
 
     if (!element) {
@@ -44,6 +48,7 @@
   }
 
   updateSubscriberText();
+  window.addEventListener('urlchange', updateSubscriberText);
 
   const observer = new MutationObserver(updateSubscriberText);
 
