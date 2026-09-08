@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Language Switcher for Google
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.0
+// @version      1.1.2
 // @description  Add a compact language switcher to Google pages
 // @author       ballban
 // @match        https://www.google.com/*
@@ -24,13 +24,9 @@
     { label: "ko", hl: "ko", lr: "lang_ko", domain: "co.kr" },
   ]);
 
-  const INSERTION_POINTS = [
-    { selector: "#rhs > div:first-of-type", placement: "rhs", method: "before" },
-    { selector: "#appbar", placement: "appbar", method: "after" },
-  ];
-
   let injectionScheduled = false;
-  let hiddenByUser = false;
+  let removedByUser = false;
+  let observer = null;
 
   function getGoogleDomain(hostname) {
     const match = hostname.toLowerCase().match(/(?:^|\.)google\.(com(?:\.hk)?|co\.jp|co\.kr)$/);
@@ -84,41 +80,42 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${SWITCHER_ID} {
+        position: fixed;
+        top: 92px;
+        right: 16px;
+        z-index: 2147483647;
         display: block;
         box-sizing: border-box;
-        width: fit-content;
-        max-width: 100%;
-        margin: 6px 0;
-        padding: 7px 10px;
+        width: max-content;
+        max-width: calc(100vw - 32px);
+        margin: 0;
+        padding: 5px 7px 6px;
         border: 1px solid #dadce0;
-        border-radius: 8px;
-        background: #fff;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 1px 3px rgba(60, 64, 67, 0.24);
         color: #202124;
-        font: 13px/1.3 Arial, sans-serif;
-      }
-
-      #${SWITCHER_ID}[data-placement='appbar'] {
-        position: relative;
-        z-index: 1;
-        margin: 8px 0;
+        font: 16px/1.2 Arial, sans-serif;
       }
 
       #${SWITCHER_ID} .language-switcher-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 5px;
+        gap: 7px;
+        margin-bottom: 3px;
       }
 
       #${SWITCHER_ID} .language-switcher-title {
         font-weight: 600;
+        white-space: nowrap;
       }
 
       #${SWITCHER_ID} fieldset {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        column-gap: 7px;
+        row-gap: 2px;
         margin: 0;
         padding: 0;
         border: 0;
@@ -138,27 +135,29 @@
       #${SWITCHER_ID} .language-option {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
+        gap: 2px;
         cursor: pointer;
         white-space: nowrap;
       }
 
       #${SWITCHER_ID} input {
+        width: 13px;
+        height: 13px;
         margin: 0;
         accent-color: #1a73e8;
       }
 
       #${SWITCHER_ID} button {
-        min-width: 22px;
-        min-height: 22px;
-        padding: 0 5px;
+        min-width: 0;
+        min-height: 0;
+        padding: 1px 3px;
         border: 1px solid transparent;
-        border-radius: 4px;
+        border-radius: 3px;
         background: transparent;
         color: #5f6368;
         cursor: pointer;
         font: inherit;
-        line-height: 1;
+        line-height: 1.1;
       }
 
       #${SWITCHER_ID} button:hover,
@@ -168,9 +167,43 @@
         color: #202124;
         outline: none;
       }
+
+      @media (max-width: 600px) {
+        #${SWITCHER_ID} {
+          top: 76px;
+          right: 8px;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        #${SWITCHER_ID} {
+          border-color: #5f6368;
+          background: rgba(48, 49, 52, 0.96);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+          color: #e8eaed;
+        }
+
+        #${SWITCHER_ID} button {
+          color: #bdc1c6;
+        }
+
+        #${SWITCHER_ID} button:hover,
+        #${SWITCHER_ID} button:focus-visible {
+          border-color: #5f6368;
+          background: #3c4043;
+          color: #e8eaed;
+        }
+      }
     `;
 
     (document.head || document.documentElement).append(style);
+  }
+
+  function removeSwitcher() {
+    removedByUser = true;
+    document.getElementById(SWITCHER_ID)?.remove();
+    document.getElementById(STYLE_ID)?.remove();
+    observer?.disconnect();
   }
 
   function createSwitcher() {
@@ -185,19 +218,16 @@
 
     const title = document.createElement("span");
     title.className = "language-switcher-title";
-    title.textContent = "Language";
+    title.textContent = "Language:";
 
-    const hideButton = document.createElement("button");
-    hideButton.type = "button";
-    hideButton.textContent = "×";
-    hideButton.title = "Hide language switcher";
-    hideButton.setAttribute("aria-label", "Hide language switcher");
-    hideButton.addEventListener("click", () => {
-      hiddenByUser = true;
-      container.remove();
-    });
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.textContent = "del";
+    deleteButton.title = "Remove language switcher";
+    deleteButton.setAttribute("aria-label", "Remove language switcher");
+    deleteButton.addEventListener("click", removeSwitcher);
 
-    header.append(title, hideButton);
+    header.append(title, deleteButton);
 
     const fieldset = document.createElement("fieldset");
     const legend = document.createElement("legend");
@@ -227,39 +257,13 @@
     return container;
   }
 
-  function findInsertionPoint() {
-    for (const insertionPoint of INSERTION_POINTS) {
-      const target = document.querySelector(insertionPoint.selector);
-
-      if (target) {
-        return { ...insertionPoint, target };
-      }
-    }
-
-    return null;
-  }
-
   function tryInject() {
-    if (hiddenByUser || document.getElementById(SWITCHER_ID)) {
-      return;
-    }
-
-    const insertionPoint = findInsertionPoint();
-
-    if (!insertionPoint) {
+    if (removedByUser || document.getElementById(SWITCHER_ID) || !document.body) {
       return;
     }
 
     addStyles();
-
-    const switcher = createSwitcher();
-    switcher.dataset.placement = insertionPoint.placement;
-
-    if (insertionPoint.method === "before") {
-      insertionPoint.target.before(switcher);
-    } else {
-      insertionPoint.target.after(switcher);
-    }
+    document.body.append(createSwitcher());
   }
 
   function scheduleInjection() {
@@ -277,7 +281,7 @@
   addStyles();
   tryInject();
 
-  const observer = new MutationObserver(scheduleInjection);
+  observer = new MutationObserver(scheduleInjection);
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
