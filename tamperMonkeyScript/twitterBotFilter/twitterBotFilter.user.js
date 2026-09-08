@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.10
+// @version      1.0.11
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -26,6 +26,24 @@
     contentFilters: "tbf_contentFilters",
     authorFilters: "tbf_authorFilters",
   };
+
+  const SINGLE_EMOJI_PATTERN = "^\\s*(?:"
+    + "\\p{Regional_Indicator}{2}|"
+    + "[0-9#*]\\uFE0F?\\u20E3|"
+    + "\\u{1F3F4}[\\u{E0030}-\\u{E0039}\\u{E0061}-\\u{E007A}]+\\u{E007F}|"
+    + "\\p{Extended_Pictographic}\\uFE0F?\\p{Emoji_Modifier}?"
+    + "(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?\\p{Emoji_Modifier}?)*"
+    + ")\\s*$";
+
+  function upgradeSingleEmojiRule(filter) {
+    const legacyPattern =
+      "^\\s*\\p{Extended_Pictographic}(\\uFE0F|\\u200D\\p{Extended_Pictographic}|\\p{Emoji_Modifier})*\\s*$";
+    if (!filter.isRegex || filter.name !== "单个Emoji" || filter.pattern !== legacyPattern) {
+      return false;
+    }
+    filter.pattern = SINGLE_EMOJI_PATTERN;
+    return true;
+  }
 
   function isValidFilter(filter) {
     return filter !== null
@@ -142,6 +160,7 @@
       }
 
       for (const type of types) {
+        if (type === "contentFilters") data[type].forEach(upgradeSingleEmojiRule);
         saveFilters(STORAGE_KEYS[type], data[type]);
       }
       return true;
@@ -1616,33 +1635,32 @@
   // 7. 初始化
   // ============================================================
 
-  // ---- 默认规则初始化（仅首次运行） ----
+  // ---- 首次初始化，以及未自定义的内置规则升级 ----
   function initDefaultRules() {
     const DEFAULTS_KEY = "tbf_defaultsInitialized";
-    if (GM_getValue(DEFAULTS_KEY, false)) return;
+    const initialized = GM_getValue(DEFAULTS_KEY, false);
+    const filters = loadFilters(STORAGE_KEYS.contentFilters);
+    let changed = false;
 
-    const defaultContentFilters = [
-      {
-        pattern:
-          "^\\s*\\p{Extended_Pictographic}(\\uFE0F|\\u200D\\p{Extended_Pictographic}|\\p{Emoji_Modifier})*\\s*$",
+    for (const filter of filters) {
+      if (upgradeSingleEmojiRule(filter)) changed = true;
+    }
+    if (!initialized && filters.length === 0) {
+      filters.push({
+        pattern: SINGLE_EMOJI_PATTERN,
         isRegex: true,
         enabled: true,
         name: "单个Emoji",
-      },
-    ];
-
-    // 仅在没有已有规则时写入默认值
-    const existing = loadFilters(STORAGE_KEYS.contentFilters);
-    if (existing.length === 0) {
-      saveFilters(STORAGE_KEYS.contentFilters, defaultContentFilters);
+      });
+      changed = true;
     }
 
-    GM_setValue(DEFAULTS_KEY, true);
-    console.log("[Twitter Bot Filter] 📋 已初始化默认过滤规则");
+    if (changed) saveFilters(STORAGE_KEYS.contentFilters, filters);
+    if (!initialized) GM_setValue(DEFAULTS_KEY, true);
   }
 
   function init() {
-    // 初始化默认规则（仅首次）
+    // 初始化或升级内置规则，不重新添加用户已删除的规则
     initDefaultRules();
 
     // 创建悬浮按钮
