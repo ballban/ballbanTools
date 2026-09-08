@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         楽天証券 口座別保有商品表示拡張
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.6.0
+// @version      1.6.1
 // @description  楽天証券の国内株式保有商品一覧に、変化率・変動額・評価損益金額・評価損益率を表示します
 // @author       ballban
 // @icon         https://www.rakuten-sec.co.jp/favicon.ico
@@ -520,9 +520,15 @@
       if (tables.length === 0) {
         return;
       }
-      addStyles();
-      for (const table of tables) {
-        enhanceTable(table);
+      // Observe site updates, not the DOM changes made by this enhancement.
+      observer.disconnect();
+      try {
+        addStyles();
+        for (const table of tables) {
+          enhanceTable(table);
+        }
+      } finally {
+        observer.observe(document.documentElement, observationOptions);
       }
     };
 
@@ -533,14 +539,15 @@
     }
   }
 
-  const observer = new MutationObserver(scheduleEnhancement);
-  observer.observe(document.documentElement, {
+  const observationOptions = {
     attributes: true,
     attributeFilter: ['class', 'style'],
     characterData: true,
     childList: true,
     subtree: true,
-  });
+  };
+  const observer = new MutationObserver(scheduleEnhancement);
+  observer.observe(document.documentElement, observationOptions);
 
   scheduleEnhancement();
 })();
