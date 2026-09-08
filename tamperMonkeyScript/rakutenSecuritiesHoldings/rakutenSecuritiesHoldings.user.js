@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         楽天証券 口座別保有商品表示拡張
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.6.1
+// @version      1.6.2
 // @description  楽天証券の国内株式保有商品一覧に、変化率・変動額・評価損益金額・評価損益率を表示します
 // @author       ballban
 // @icon         https://www.rakuten-sec.co.jp/favicon.ico
@@ -164,10 +164,11 @@
     const firstBody = Array.from(currentCell.children).find(function (element) {
       return element.classList.contains('mbody')
         && !element.classList.contains('stockval_area_0')
-        && !element.classList.contains('stockval_area_1');
+        && !element.classList.contains('stockval_area_1')
+        && !element.classList.contains(TOTAL_CHANGE_LINE);
     });
 
-    return parseNumber(firstBody ? firstBody.textContent : currentCell.textContent);
+    return originalNumberFromElement(firstBody || currentCell);
   }
 
   function stockValueArea(currentCell, areaClass) {
@@ -176,8 +177,25 @@
     }) || null;
   }
 
-  function changeFromArea(area) {
-    return area ? parseNumber(area.textContent) : null;
+  function originalNumberFromElement(element) {
+    if (!element) {
+      return null;
+    }
+
+    let text = '';
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE
+        && !node.classList.contains(PERCENTAGE_LINE)
+        && !node.classList.contains(TOTAL_CHANGE_LINE)
+        && !node.classList.contains('stockval_area_0')
+        && !node.classList.contains('stockval_area_1')) {
+        text += node.textContent;
+      }
+    }
+
+    return parseNumber(text);
   }
   function areaIsVisible(area) {
     return Boolean(area) && window.getComputedStyle(area).display !== 'none';
@@ -189,7 +207,7 @@
     const selectedArea = areaIsVisible(monthArea) && !areaIsVisible(dayArea)
       ? monthArea
       : (dayArea || monthArea);
-    return changeFromArea(selectedArea);
+    return originalNumberFromElement(selectedArea);
   }
 
 
@@ -227,7 +245,7 @@
 
     setValueLine(
       line,
-      percentageFromChange(currentValue, changeFromArea(area)),
+      percentageFromChange(currentValue, originalNumberFromElement(area)),
       '%',
       2,
       2,
