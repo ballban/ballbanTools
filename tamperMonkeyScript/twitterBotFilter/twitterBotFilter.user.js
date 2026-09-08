@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.6
+// @version      1.0.7
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -25,10 +25,28 @@
     authorFilters: "tbf_authorFilters",
   };
 
+  function isValidFilter(filter) {
+    return filter !== null
+      && typeof filter === "object"
+      && typeof filter.pattern === "string"
+      && filter.pattern.trim().length > 0
+      && typeof filter.isRegex === "boolean"
+      && typeof filter.enabled === "boolean"
+      && (filter.name === undefined || typeof filter.name === "string");
+  }
+
   function loadFilters(key) {
     try {
-      const raw = GM_getValue(key, "[]");
-      return JSON.parse(raw);
+      const filters = JSON.parse(GM_getValue(key, "[]"));
+      if (!Array.isArray(filters)) return [];
+
+      // Keep valid saved rules usable even if an older import stored malformed entries.
+      let count = 0;
+      for (const filter of filters) {
+        if (isValidFilter(filter)) filters[count++] = filter;
+      }
+      filters.length = count;
+      return filters;
     } catch {
       return [];
     }
@@ -99,15 +117,34 @@
   function importFiltersJSON(jsonStr) {
     try {
       const data = JSON.parse(jsonStr);
-      if (data.contentFilters && Array.isArray(data.contentFilters)) {
-        saveFilters(STORAGE_KEYS.contentFilters, data.contentFilters);
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("规则文件必须是 JSON 对象");
       }
-      if (data.authorFilters && Array.isArray(data.authorFilters)) {
-        saveFilters(STORAGE_KEYS.authorFilters, data.authorFilters);
+
+      const types = Object.keys(STORAGE_KEYS).filter((type) =>
+        Object.prototype.hasOwnProperty.call(data, type),
+      );
+      if (types.length === 0) {
+        throw new Error("文件中没有内容规则或作者规则");
+      }
+
+      // Validate every supplied category before changing either saved list.
+      for (const type of types) {
+        const filters = data[type];
+        if (!Array.isArray(filters) || filters.some((filter) => !isValidFilter(filter))) {
+          throw new Error(`${type} 包含无效的规则结构`);
+        }
+        for (const filter of filters) {
+          if (filter.isRegex) new RegExp(filter.pattern, "iu");
+        }
+      }
+
+      for (const type of types) {
+        saveFilters(STORAGE_KEYS[type], data[type]);
       }
       return true;
     } catch (e) {
-      alert("导入失败: JSON 格式错误\n" + e.message);
+      alert("导入失败: " + e.message);
       return false;
     }
   }
