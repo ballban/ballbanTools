@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Show YouTube Subscriber
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.0
+// @version      1.0.1
 // @description  Modify the subscriber text on YouTube video pages
 // @author       ballban
 // @icon         https://www.youtube.com/favicon.ico
@@ -31,8 +31,8 @@
       return;
     }
 
-    // Preserve the original behavior: remove the content before the first whitespace.
-    const newText = text.replace(/^\S+\s+/, '').trim();
+    // Strip a leading label only when the next token starts with the count.
+    const newText = text.replace(/^[^\p{Decimal_Number}\s]+\s+(?=\p{Decimal_Number})/u, '').trim();
 
     if (newText === text) {
       lastWrittenText.set(element, text);
