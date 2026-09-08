@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.9
+// @version      1.0.10
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -11,6 +11,7 @@
 // @grant        GM_setValue
 // @grant        GM_addStyle
 // @grant        window.onurlchange
+// @grant        unsafeWindow
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -1278,6 +1279,14 @@
       tweetEl.removeAttribute(COLLAPSED_ATTR);
       updateFilteredCount(-1);
     }
+    if (state?.blockPresentation) {
+      if (tweetEl.style.opacity === "0.3") {
+        tweetEl.style.opacity = state.blockPresentation.opacity;
+      }
+      if (tweetEl.style.transition === "opacity 0.5s") {
+        tweetEl.style.transition = state.blockPresentation.transition;
+      }
+    }
     tweetEl.querySelectorAll(".tbf-block-btn").forEach((button) => button.remove());
     tweetStates.delete(tweetEl);
   }
@@ -1323,7 +1332,10 @@
     clearTimeout(blockBtn._resetTimer);
     blockBtn.disabled = true;
     blockBtn.classList.add("tbf-blocking");
+    blockBtn.title = "正在等待 X 确认拉黑结果";
     blockBtn.textContent = "\u23F3";
+    let succeeded = false;
+    let unconfirmed = false;
 
     try {
       const targetState = tweetStates.get(tweetEl);
@@ -1365,22 +1377,131 @@
       );
       assertCurrentTarget();
       if (!confirmBtn?.isConnected) throw new Error("找不到该作者的确认框");
-      confirmBtn.click();
+      await confirmBlockWithResponse(confirmBtn, authorHandle);
 
-      blockBtn.textContent = "\u2705";
-      tweetEl.style.transition = "opacity 0.5s";
-      tweetEl.style.opacity = "0.3";
+      succeeded = true;
+      if (tweetStates.get(tweetEl) === targetState && blockBtn.isConnected) {
+        blockBtn.textContent = "\u2705";
+        blockBtn.title = `已拉黑 @${authorHandle}`;
+        targetState.blockPresentation = {
+          opacity: tweetEl.style.opacity,
+          transition: tweetEl.style.transition,
+        };
+        tweetEl.style.transition = "opacity 0.5s";
+        tweetEl.style.opacity = "0.3";
+      }
+      showToast(`已拉黑 @${authorHandle}`);
     } catch (err) {
-      blockBtn.textContent = "\u274C";
-      showToast("拉黑失败: " + err.message);
-      blockBtn._resetTimer = setTimeout(() => {
-        blockBtn.textContent = "\u{1F6AB}";
-      }, 2000);
+      unconfirmed = err.name === "BlockResultUnknownError";
+      blockBtn.textContent = unconfirmed ? "?" : "\u274C";
+      blockBtn.title = err.message;
+      showToast(unconfirmed ? err.message : "拉黑失败: " + err.message);
+      if (!unconfirmed) {
+        blockBtn._resetTimer = setTimeout(() => {
+          blockBtn.textContent = "\u{1F6AB}";
+          blockBtn.title = "快速拉黑此用户";
+        }, 2000);
+      }
     } finally {
       blockInProgress = false;
-      blockBtn.disabled = false;
+      blockBtn.disabled = succeeded || unconfirmed;
       blockBtn.classList.remove("tbf-blocking");
     }
+  }
+
+  function confirmBlockWithResponse(confirmButton, authorHandle) {
+    const xhrPrototype = unsafeWindow.XMLHttpRequest.prototype;
+    const originalOpen = xhrPrototype.open;
+    const expectedHandle = authorHandle.toLowerCase();
+
+    return new Promise((resolve, reject) => {
+      const requests = new Set();
+      let finished = false;
+      let timer;
+      const unknownResult = () => {
+        const error = new Error("未能确认拉黑结果，请在 X 中核对后刷新页面");
+        error.name = "BlockResultUnknownError";
+        return error;
+      };
+      const finish = (error) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        if (xhrPrototype.open === observeOpen) xhrPrototype.open = originalOpen;
+        for (const request of requests) request.removeEventListener("loadend", handleResult);
+        requests.clear();
+        if (error) reject(error);
+        else resolve();
+      };
+      const handleResult = (event) => {
+        const request = event.currentTarget;
+        requests.delete(request);
+        if (finished) return;
+        if (request.status === 0) {
+          finish(unknownResult());
+          return;
+        }
+        if (request.status < 200 || request.status >= 300) {
+          finish(new Error(`X 拒绝了拉黑请求（HTTP ${request.status}）`));
+          return;
+        }
+
+        let user;
+        try {
+          user = request.responseType === "json"
+            ? request.response
+            : JSON.parse(request.responseText);
+        } catch {
+          finish(unknownResult());
+          return;
+        }
+        if (Array.isArray(user?.errors) && user.errors.length) {
+          finish(new Error("X 返回了拉黑错误"));
+          return;
+        }
+        if (typeof user?.screen_name !== "string") {
+          finish(unknownResult());
+          return;
+        }
+        if (user.screen_name.toLowerCase() !== expectedHandle) return;
+
+        // The REST block endpoint returns the affected user, not a UI click acknowledgement.
+        if ("blocking" in user && user.blocking !== true) {
+          finish(new Error("X 未确认该用户已被拉黑"));
+          return;
+        }
+        finish();
+      };
+      function observeOpen(method, url) {
+        const result = Reflect.apply(originalOpen, this, arguments);
+        if (finished || String(method).toUpperCase() !== "POST"
+          || !String(url).includes("blocks/create")) return result;
+
+        let endpoint;
+        try {
+          endpoint = new URL(String(url), window.location.href);
+        } catch {
+          return result;
+        }
+        if (endpoint.origin !== window.location.origin
+          && endpoint.hostname !== "api.x.com"
+          && endpoint.hostname !== "api.twitter.com") return result;
+        if (!/\/blocks\/create(?:\.json)?$/.test(endpoint.pathname)) return result;
+
+        requests.add(this);
+        this.addEventListener("loadend", handleResult, { once: true });
+        return result;
+      }
+
+      // X's native client uses XHR. Observe only this operation; send no additional requests.
+      timer = setTimeout(() => finish(unknownResult()), 10000);
+      try {
+        xhrPrototype.open = observeOpen;
+        confirmButton.click();
+      } catch (error) {
+        finish(error);
+      }
+    });
   }
 
   function findVisibleElement(selector, accept) {
