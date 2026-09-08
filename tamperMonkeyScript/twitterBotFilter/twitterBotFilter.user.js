@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.7
+// @version      1.0.8
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -10,6 +10,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_addStyle
+// @grant        window.onurlchange
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -1086,9 +1087,9 @@
   // 5. 推文处理模块
   // ============================================================
 
-  const PROCESSED_ATTR = "data-tbf-processed";
+  const TWEET_SELECTOR = 'article[data-testid="tweet"]';
   const COLLAPSED_ATTR = "data-tbf-collapsed";
-  const BLOCK_BUTTON_PENDING_ATTR = "data-tbf-block-button-pending";
+  const tweetStates = new WeakMap();
 
   function matchesFilter(text, filters) {
     if (!text) return null;
@@ -1167,26 +1168,48 @@
   }
 
   function processTweet(tweetEl) {
-    if (tweetEl.getAttribute(PROCESSED_ATTR)) return;
-    tweetEl.setAttribute(PROCESSED_ATTR, "1");
+    if (!tweetEl.isConnected) return;
 
-    // 首页只显示拉黑按钮，保持原有行为，不执行内容和作者折叠过滤
-    if (!window.location.pathname.startsWith("/home")) {
-      const contentFilters = loadFilters(STORAGE_KEYS.contentFilters);
-      const authorFilters = loadFilters(STORAGE_KEYS.authorFilters);
+    const home = isHomePage();
+    const tweetText = extractTweetText(tweetEl);
+    const authorHandle = extractAuthorHandle(tweetEl);
+    const authorDisplayName = extractAuthorDisplayName(tweetEl);
+    const tweetUrl = tweetEl
+      .querySelector('[data-testid="User-Name"] a[href*="/status/"]')
+      ?.getAttribute("href");
+    const previous = tweetStates.get(tweetEl);
 
-      const tweetText = extractTweetText(tweetEl);
-      const authorHandle = extractAuthorHandle(tweetEl);
-      const authorDisplayName = extractAuthorDisplayName(tweetEl);
+    if (previous
+      && previous.home === home
+      && previous.tweetText === tweetText
+      && previous.authorHandle === authorHandle
+      && previous.authorDisplayName === authorDisplayName
+      && previous.tweetUrl === tweetUrl) {
+      if (previous.hint) {
+        if (previous.hint.parentNode !== tweetEl.parentNode
+          || previous.hint.nextElementSibling !== tweetEl) {
+          tweetEl.before(previous.hint);
+        }
+      } else {
+        injectBlockButton(tweetEl);
+      }
+      return;
+    }
 
-      // 检查内容过滤
-      const contentMatch = matchesFilter(tweetText, contentFilters);
+    resetTweet(tweetEl);
+    tweetStates.set(tweetEl, {
+      home, tweetText, authorHandle, authorDisplayName, tweetUrl, hint: null,
+    });
+
+    // 首页仅提供拉黑按钮；正文、作者或页面变化后重新判断过滤。
+    if (!home) {
+      const contentMatch = matchesFilter(tweetText, loadFilters(STORAGE_KEYS.contentFilters));
       if (contentMatch) {
         collapseTweet(tweetEl, "内容规则", contentMatch);
         return;
       }
 
-      // 检查作者过滤（同时匹配 handle 和 显示名称）
+      const authorFilters = loadFilters(STORAGE_KEYS.authorFilters);
       const authorMatch =
         matchesFilter(authorHandle, authorFilters) ||
         matchesFilter(authorDisplayName, authorFilters);
@@ -1196,15 +1219,12 @@
       }
     }
 
-    // 未匹配 → 注入拉黑按钮；右上角菜单可能稍后才挂载
-    if (!injectBlockButton(tweetEl)) {
-      observeForBlockButtonAnchor(tweetEl);
-    }
+    injectBlockButton(tweetEl);
   }
 
   function collapseTweet(tweetEl, ruleType, matchedFilter) {
-    // 如果已经折叠过，先还原
-    if (tweetEl.getAttribute(COLLAPSED_ATTR)) return;
+    const state = tweetStates.get(tweetEl);
+    if (!state || state.hint) return;
     tweetEl.setAttribute(COLLAPSED_ATTR, "1");
 
     // 规则显示名：优先用自定义名称，否则回退到 "规则类型: 匹配模式"
@@ -1214,6 +1234,7 @@
 
     // 隐藏推文原有内容
     const originalDisplay = tweetEl.style.display;
+    state.originalDisplay = originalDisplay;
     tweetEl.style.display = "none";
 
     // 创建折叠提示
@@ -1240,6 +1261,7 @@
     });
 
     tweetEl.parentNode.insertBefore(hint, tweetEl);
+    state.hint = hint;
     updateFilteredCount(1);
   }
 
@@ -1247,28 +1269,23 @@
     return str.length > maxLen ? str.slice(0, maxLen) + "…" : str;
   }
 
-  function uncollapseAll() {
-    document.querySelectorAll(".tbf-collapsed-hint").forEach((hint) => {
-      hint.remove();
-    });
-    document.querySelectorAll(`[${COLLAPSED_ATTR}]`).forEach((el) => {
-      el.style.display = "";
-      el.removeAttribute(COLLAPSED_ATTR);
-    });
-    filteredCount = 0;
-    updateFilteredCount(0);
+  function resetTweet(tweetEl) {
+    const state = tweetStates.get(tweetEl);
+    if (state?.hint) {
+      state.hint.remove();
+      tweetEl.style.display = state.originalDisplay;
+      tweetEl.removeAttribute(COLLAPSED_ATTR);
+      updateFilteredCount(-1);
+    }
+    tweetEl.querySelectorAll(".tbf-block-btn").forEach((button) => button.remove());
+    tweetStates.delete(tweetEl);
   }
 
   function reprocessAllTweets() {
-    // 清除所有折叠和标记
-    uncollapseAll();
-    document.querySelectorAll(`[${PROCESSED_ATTR}]`).forEach((el) => {
-      el.removeAttribute(PROCESSED_ATTR);
-      // 移除拉黑按钮
-      el.querySelectorAll(".tbf-block-btn").forEach((btn) => btn.remove());
-    });
-    // 重新处理所有推文
-    document.querySelectorAll('article[data-testid="tweet"]').forEach(processTweet);
+    const tweets = document.querySelectorAll(TWEET_SELECTOR);
+    tweets.forEach(resetTweet);
+    resetFilteredCount();
+    tweets.forEach(processTweet);
   }
 
   // ---- 拉黑按钮 ----
@@ -1294,32 +1311,6 @@
     return true;
   }
 
-  function observeForBlockButtonAnchor(tweetEl) {
-    if (tweetEl.getAttribute(BLOCK_BUTTON_PENDING_ATTR)) return;
-    tweetEl.setAttribute(BLOCK_BUTTON_PENDING_ATTR, "1");
-
-    let timeoutId;
-    const observer = new MutationObserver(() => {
-      if (!tweetEl.isConnected || tweetEl.getAttribute(COLLAPSED_ATTR)) {
-        cleanup();
-        return;
-      }
-      if (injectBlockButton(tweetEl)) cleanup();
-    });
-
-    const cleanup = () => {
-      observer.disconnect();
-      clearTimeout(timeoutId);
-      tweetEl.removeAttribute(BLOCK_BUTTON_PENDING_ATTR);
-    };
-
-    observer.observe(tweetEl, {
-      childList: true,
-      subtree: true,
-    });
-
-    timeoutId = setTimeout(cleanup, 5000);
-  }
 
   async function performBlock(tweetEl, blockBtn) {
     blockBtn.classList.add("tbf-blocking");
@@ -1397,26 +1388,44 @@
   // ============================================================
 
   function startObserver() {
+    const pendingTweets = new Set();
+    const collectTweets = (node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      if (node.matches(TWEET_SELECTOR)) pendingTweets.add(node);
+      for (const tweet of node.querySelectorAll(TWEET_SELECTOR)) {
+        pendingTweets.add(tweet);
+      }
+    };
+
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const target = mutation.target.nodeType === Node.ELEMENT_NODE
+          ? mutation.target
+          : mutation.target.parentElement;
+        const owner = target?.closest(TWEET_SELECTOR);
+        if (owner) pendingTweets.add(owner);
+        else if (target && tweetStates.has(target)) pendingTweets.add(target);
 
-          // 如果添加的节点本身是推文
-          if (node.matches && node.matches('article[data-testid="tweet"]')) {
-            processTweet(node);
-          }
-
-          // 检查子元素中的推文
-          if (node.querySelectorAll) {
-            node.querySelectorAll('article[data-testid="tweet"]').forEach(processTweet);
-          }
+        for (const node of mutation.addedNodes) collectTweets(node);
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType !== Node.ELEMENT_NODE || node.isConnected) continue;
+          if (tweetStates.has(node)) resetTweet(node);
+          for (const tweet of node.querySelectorAll(TWEET_SELECTOR)) resetTweet(tweet);
         }
       }
+
+      for (const tweet of pendingTweets) {
+        if (tweet.isConnected && tweet.matches(TWEET_SELECTOR)) processTweet(tweet);
+        else resetTweet(tweet);
+      }
+      pendingTweets.clear();
     });
 
     observer.observe(document.body, {
       childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["href", "alt", "data-testid"],
       subtree: true,
     });
   }
@@ -1429,23 +1438,10 @@
       if (nextLocation === currentLocation) return;
 
       currentLocation = nextLocation;
-      resetFilteredCount();
+      reprocessAllTweets();
     };
 
-    const originalPushState = window.history.pushState;
-    window.history.pushState = function (...args) {
-      const result = originalPushState.apply(this, args);
-      handleRouteChange();
-      return result;
-    };
-
-    const originalReplaceState = window.history.replaceState;
-    window.history.replaceState = function (...args) {
-      const result = originalReplaceState.apply(this, args);
-      handleRouteChange();
-      return result;
-    };
-
+    window.addEventListener("urlchange", handleRouteChange);
     window.addEventListener("popstate", handleRouteChange);
     window.addEventListener("hashchange", handleRouteChange);
     renderFilteredCount();
@@ -1488,7 +1484,7 @@
     createFloatButton();
 
     // 处理页面上已有的推文
-    document.querySelectorAll('article[data-testid="tweet"]').forEach(processTweet);
+    document.querySelectorAll(TWEET_SELECTOR).forEach(processTweet);
 
     // 启动 MutationObserver
     startObserver();
