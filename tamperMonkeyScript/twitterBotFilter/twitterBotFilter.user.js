@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.5
+// @version      1.0.6
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -953,6 +953,10 @@
       const reader = new FileReader();
       reader.onload = (ev) => {
         if (importFiltersJSON(ev.target.result)) {
+          if (editingState) {
+            resetRuleForm(editingState.type);
+            editingState = null;
+          }
           refreshRulesList("content");
           refreshRulesList("author");
           reprocessAllTweets();
@@ -1015,9 +1019,13 @@
         el.addEventListener("click", (e) => {
           e.stopPropagation();
           removeFilter(key, idx);
-          if (editingState && editingState.type === type && editingState.idx === idx) {
-            resetRuleForm(type);
-            editingState = null;
+          if (editingState && editingState.type === type) {
+            if (editingState.idx === idx) {
+              resetRuleForm(type);
+              editingState = null;
+            } else if (editingState.idx > idx) {
+              editingState.idx--;
+            }
           }
           refreshRulesList(type);
           reprocessAllTweets();
