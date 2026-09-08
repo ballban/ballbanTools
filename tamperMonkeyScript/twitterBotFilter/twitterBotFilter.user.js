@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.8
+// @version      1.0.9
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -1090,6 +1090,7 @@
   const TWEET_SELECTOR = 'article[data-testid="tweet"]';
   const COLLAPSED_ATTR = "data-tbf-collapsed";
   const tweetStates = new WeakMap();
+  let blockInProgress = false;
 
   function matchesFilter(text, filters) {
     if (!text) return null;
@@ -1313,60 +1314,97 @@
 
 
   async function performBlock(tweetEl, blockBtn) {
+    if (blockInProgress) {
+      showToast("上一次拉黑尚未结束，请稍后再试");
+      return;
+    }
+
+    blockInProgress = true;
+    clearTimeout(blockBtn._resetTimer);
+    blockBtn.disabled = true;
     blockBtn.classList.add("tbf-blocking");
-    blockBtn.innerHTML = "⏳";
+    blockBtn.textContent = "\u23F3";
 
     try {
-      // Step 1: 点击 caret 菜单
+      const targetState = tweetStates.get(tweetEl);
+      const authorHandle = extractAuthorHandle(tweetEl);
+      if (!targetState || !authorHandle || !/^[A-Za-z0-9_]+$/.test(authorHandle)) {
+        throw new Error("无法确定推文作者");
+      }
+      const authorPattern = new RegExp(`@${authorHandle}(?![A-Za-z0-9_])`, "i");
+      const assertCurrentTarget = () => {
+        if (!tweetEl.isConnected || tweetStates.get(tweetEl) !== targetState
+          || extractAuthorHandle(tweetEl) !== authorHandle) {
+          throw new Error("推文已变化，已取消拉黑");
+        }
+      };
+      if (findVisibleElement('[role="dialog"], [data-testid="Dropdown"], [data-testid="block"], [data-testid="confirmationSheetConfirm"]')) {
+        throw new Error("请先关闭当前菜单或确认框");
+      }
+
+      assertCurrentTarget();
       const caret = tweetEl.querySelector('[data-testid="caret"]');
       if (!caret) throw new Error("找不到推文菜单按钮");
       caret.click();
 
-      // Step 2: 等待菜单出现并点击拉黑
-      const blockMenuItem = await waitForElement('[data-testid="block"]', 2000);
-      if (!blockMenuItem) throw new Error("找不到拉黑选项");
+      const blockMenuItem = await waitForElement(
+        '[data-testid="block"]', 2000,
+        (element) => authorPattern.test(element.textContent),
+      );
+      assertCurrentTarget();
+      if (!blockMenuItem?.isConnected) throw new Error("找不到该作者的拉黑选项");
       blockMenuItem.click();
 
-      // Step 3: 等待确认弹窗并点击确认
-      const confirmBtn = await waitForElement('[data-testid="confirmationSheetConfirm"]', 2000);
-      if (!confirmBtn) throw new Error("找不到确认按钮");
+      const confirmBtn = await waitForElement(
+        '[data-testid="confirmationSheetConfirm"]', 2000,
+        (element) => {
+          const dialog = element.closest('[role="dialog"]')
+            || element.closest('[data-testid="confirmationSheetDialog"]');
+          return Boolean(dialog) && authorPattern.test(dialog.textContent);
+        },
+      );
+      assertCurrentTarget();
+      if (!confirmBtn?.isConnected) throw new Error("找不到该作者的确认框");
       confirmBtn.click();
 
-      // 成功
-      blockBtn.innerHTML = "✅";
-      blockBtn.classList.remove("tbf-blocking");
-
-      // 渐隐推文
+      blockBtn.textContent = "\u2705";
       tweetEl.style.transition = "opacity 0.5s";
       tweetEl.style.opacity = "0.3";
     } catch (err) {
-      blockBtn.innerHTML = "❌";
-      blockBtn.classList.remove("tbf-blocking");
-      showToast("❌ 拉黑失败: " + err.message);
-
-      // 尝试关闭可能打开的菜单
-      const closeMenu = document.querySelector('[data-testid="Dropdown"]');
-      if (closeMenu) {
-        document.body.click();
-      }
-
-      // 恢复按钮
-      setTimeout(() => {
-        blockBtn.innerHTML = "🚫";
+      blockBtn.textContent = "\u274C";
+      showToast("拉黑失败: " + err.message);
+      blockBtn._resetTimer = setTimeout(() => {
+        blockBtn.textContent = "\u{1F6AB}";
       }, 2000);
+    } finally {
+      blockInProgress = false;
+      blockBtn.disabled = false;
+      blockBtn.classList.remove("tbf-blocking");
     }
   }
 
-  function waitForElement(selector, timeout = 2000) {
+  function findVisibleElement(selector, accept) {
+    for (const element of document.querySelectorAll(selector)) {
+      if (element.getClientRects().length === 0
+        || window.getComputedStyle(element).visibility === "hidden"
+        || element.closest('[hidden], [aria-hidden="true"]')) continue;
+      if (!accept || accept(element)) return element;
+    }
+    return null;
+  }
+
+  function waitForElement(selector, timeout = 2000, accept) {
+    const isReady = (element) =>
+      !element.matches(':disabled, [aria-disabled="true"]') && (!accept || accept(element));
     return new Promise((resolve) => {
-      const el = document.querySelector(selector);
+      const el = findVisibleElement(selector, isReady);
       if (el) {
         resolve(el);
         return;
       }
 
       const observer = new MutationObserver(() => {
-        const el = document.querySelector(selector);
+        const el = findVisibleElement(selector, isReady);
         if (el) {
           observer.disconnect();
           clearTimeout(timer);
@@ -1374,7 +1412,13 @@
         }
       });
 
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, {
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "hidden", "aria-hidden", "disabled", "aria-disabled"],
+        subtree: true,
+      });
 
       const timer = setTimeout(() => {
         observer.disconnect();
