@@ -1,18 +1,24 @@
 // ==UserScript==
 // @name         Language Switcher for Google
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.1.2
+// @version      1.1.3
 // @description  Add a compact language switcher to Google pages
 // @author       ballban
 // @match        https://www.google.com/*
 // @match        https://www.google.com.hk/*
 // @match        https://www.google.co.jp/*
 // @match        https://www.google.co.kr/*
+// @exclude      https://www.google.com/recaptcha/*
+// @noframes
 // @icon         https://www.google.com/favicon.ico
 // ==/UserScript==
 
 (function () {
   "use strict";
+
+  if (window.top !== window.self || window.location.pathname.startsWith("/recaptcha/")) {
+    return;
+  }
 
   const SWITCHER_ID = "language-switcher-for-google";
   const STYLE_ID = `${SWITCHER_ID}-styles`;
