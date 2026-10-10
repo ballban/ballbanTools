@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Language Switcher for Google
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.1.3
+// @version      1.1.4
 // @description  Add a compact language switcher to Google pages
 // @author       ballban
 // @match        https://www.google.com/*
@@ -33,35 +33,6 @@
   let injectionScheduled = false;
   let removedByUser = false;
   let observer = null;
-
-  function getGoogleDomain(hostname) {
-    const match = hostname.toLowerCase().match(/(?:^|\.)google\.(com(?:\.hk)?|co\.jp|co\.kr)$/);
-
-    return match ? match[1] : null;
-  }
-
-  function getSelectedLanguage() {
-    const url = new URL(window.location.href);
-    const currentLanguage = url.searchParams.get("lr");
-    const currentInterface = url.searchParams.get("hl");
-
-    const selectedByLanguage = LANGUAGE_OPTIONS.find((option) => option.lr === currentLanguage);
-
-    if (selectedByLanguage) {
-      return selectedByLanguage;
-    }
-
-    const selectedByInterface = LANGUAGE_OPTIONS.find((option) => option.hl === currentInterface);
-
-    if (selectedByInterface) {
-      return selectedByInterface;
-    }
-
-    const currentDomain = getGoogleDomain(url.hostname);
-    return (
-      LANGUAGE_OPTIONS.find((option) => option.domain === currentDomain) || LANGUAGE_OPTIONS[0]
-    );
-  }
 
   function switchLanguage(option) {
     const url = new URL(window.location.href);
@@ -213,7 +184,6 @@
   }
 
   function createSwitcher() {
-    const selectedLanguage = getSelectedLanguage();
     const container = document.createElement("div");
     container.id = SWITCHER_ID;
     container.setAttribute("role", "group");
@@ -248,7 +218,6 @@
       input.type = "radio";
       input.name = `${SWITCHER_ID}-language`;
       input.value = option.hl;
-      input.checked = option === selectedLanguage;
       input.addEventListener("change", () => {
         if (input.checked) {
           switchLanguage(option);
