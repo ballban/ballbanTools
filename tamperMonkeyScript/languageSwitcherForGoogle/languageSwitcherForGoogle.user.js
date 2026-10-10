@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Language Switcher for Google
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.1.4
+// @version      1.1.5
 // @description  Add a compact language switcher to Google pages
 // @author       ballban
 // @match        https://www.google.com/*
@@ -184,6 +184,7 @@
   }
 
   function createSwitcher() {
+    const currentLr = new URL(window.location.href).searchParams.get("lr");
     const container = document.createElement("div");
     container.id = SWITCHER_ID;
     container.setAttribute("role", "group");
@@ -218,6 +219,7 @@
       input.type = "radio";
       input.name = `${SWITCHER_ID}-language`;
       input.value = option.hl;
+      input.checked = currentLr === option.lr;
       input.addEventListener("change", () => {
         if (input.checked) {
           switchLanguage(option);
