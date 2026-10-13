@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Bot Filter
 // @namespace    https://github.com/ballban/ballbanTools
-// @version      1.0.11
+// @version      1.0.12
 // @description  过滤 X/Twitter 推文内容和作者，一键拉黑用户
 // @author       ballban
 // @icon         https://abs.twimg.com/favicons/twitter.3.ico
@@ -224,11 +224,17 @@
       box-shadow: 0 4px 16px rgba(29, 155, 240, 0.35);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      /* Animate only hover/press feedback so the button tracks the pointer while dragged. */
+      transition-property: transform, box-shadow, background;
+      transition-duration: 0.25s;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
       position: fixed;
       z-index: 10000;
       left: 18px;
       bottom: 82px;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
     #tbf-float-btn:hover {
       transform: scale(1.1);
@@ -237,6 +243,9 @@
     }
     #tbf-float-btn:active {
       transform: scale(0.95);
+    }
+    #tbf-float-btn.tbf-dragging {
+      cursor: grabbing;
     }
 
     /* 徽章 */
@@ -742,6 +751,25 @@
   }
 
   // ---- 4b. 悬浮按钮 ----
+  const FLOAT_BUTTON_POSITION_KEY = "tbf_floatButtonPosition";
+  const FLOAT_BUTTON_EDGE_MARGIN = 4;
+  const FLOAT_BUTTON_DRAG_THRESHOLD = 5;
+
+  let floatButtonPosition = loadFloatButtonPosition();
+  let floatButtonDrag = null;
+  let suppressDragClick = false;
+
+  function loadFloatButtonPosition() {
+    const position = GM_getValue(FLOAT_BUTTON_POSITION_KEY, null);
+    const isValid = position !== null
+      && typeof position === "object"
+      && (position.anchorX === "left" || position.anchorX === "right")
+      && (position.anchorY === "top" || position.anchorY === "bottom")
+      && Number.isFinite(position.offsetX)
+      && Number.isFinite(position.offsetY);
+    return isValid ? position : null;
+  }
+
   function createFloatButton() {
     const btn = document.createElement("button");
     btn.id = "tbf-float-btn";
@@ -753,15 +781,115 @@
     btn.appendChild(badge);
 
     btn.addEventListener("click", togglePanel);
+    enableFloatButtonDrag(btn);
     document.body.appendChild(btn);
 
-    // 尝试定位在侧边栏账号信息上方
     positionFloatButton();
+  }
+
+  function getViewportSize() {
+    // Fixed elements are laid out in the viewport without its scrollbars.
+    const root = document.documentElement;
+    return { width: root.clientWidth, height: root.clientHeight };
+  }
+
+  function placeFloatButton(btn, left, top) {
+    const { width, height } = getViewportSize();
+    const maxLeft = width - btn.offsetWidth - FLOAT_BUTTON_EDGE_MARGIN;
+    const maxTop = height - btn.offsetHeight - FLOAT_BUTTON_EDGE_MARGIN;
+    btn.style.left = Math.max(FLOAT_BUTTON_EDGE_MARGIN, Math.min(left, maxLeft)) + "px";
+    btn.style.top = Math.max(FLOAT_BUTTON_EDGE_MARGIN, Math.min(top, maxTop)) + "px";
+    btn.style.bottom = "auto";
+  }
+
+  function saveFloatButtonPosition(btn) {
+    const { width, height } = getViewportSize();
+    const left = parseFloat(btn.style.left);
+    const top = parseFloat(btn.style.top);
+    const right = width - left - btn.offsetWidth;
+    const bottom = height - top - btn.offsetHeight;
+    // Keep the distance to the nearest edges so the button stays in its corner after resizing or zooming.
+    floatButtonPosition = {
+      anchorX: left <= right ? "left" : "right",
+      offsetX: Math.round(Math.min(left, right)),
+      anchorY: top <= bottom ? "top" : "bottom",
+      offsetY: Math.round(Math.min(top, bottom)),
+    };
+    GM_setValue(FLOAT_BUTTON_POSITION_KEY, floatButtonPosition);
+  }
+
+  function enableFloatButtonDrag(btn) {
+    btn.addEventListener("pointerdown", (e) => {
+      if (!e.isPrimary || e.button !== 0) return;
+      const rect = btn.getBoundingClientRect();
+      floatButtonDrag = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        // Hover/press scaling is centered, so the rect center still matches the untransformed box.
+        left: rect.left + (rect.width - btn.offsetWidth) / 2,
+        top: rect.top + (rect.height - btn.offsetHeight) / 2,
+        moved: false,
+      };
+      btn.setPointerCapture(e.pointerId);
+    });
+
+    btn.addEventListener("pointermove", (e) => {
+      const drag = floatButtonDrag;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      if (!drag.moved) {
+        if (Math.hypot(dx, dy) < FLOAT_BUTTON_DRAG_THRESHOLD) return;
+        drag.moved = true;
+        btn.classList.add("tbf-dragging");
+      }
+      placeFloatButton(btn, drag.left + dx, drag.top + dy);
+      if (panelOpen) positionPanel();
+    });
+
+    const endDrag = (e) => {
+      const drag = floatButtonDrag;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      floatButtonDrag = null;
+      if (!drag.moved) return;
+      btn.classList.remove("tbf-dragging");
+      saveFloatButtonPosition(btn);
+      // A mouse drag still ends with a click, which must not toggle the panel.
+      suppressDragClick = true;
+    };
+    btn.addEventListener("pointerup", endDrag);
+    btn.addEventListener("pointercancel", endDrag);
+    // Capture can be lost without a pointerup (e.g. window switch); end the drag so hovering does not move the button.
+    btn.addEventListener("lostpointercapture", endDrag);
+
+    // Browsers target the drag-ending click at the button or at a common ancestor, so filter it at the window.
+    // Touch drags produce no click, so the next press clears the flag instead.
+    window.addEventListener("pointerdown", () => {
+      suppressDragClick = false;
+    }, true);
+    window.addEventListener("click", (e) => {
+      if (!suppressDragClick) return;
+      suppressDragClick = false;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
   }
 
   function positionFloatButton() {
     const btn = document.getElementById("tbf-float-btn");
-    if (!btn) return;
+    if (!btn || floatButtonDrag) return;
+
+    if (floatButtonPosition) {
+      const { width, height } = getViewportSize();
+      const { anchorX, offsetX, anchorY, offsetY } = floatButtonPosition;
+      placeFloatButton(
+        btn,
+        anchorX === "left" ? offsetX : width - btn.offsetWidth - offsetX,
+        anchorY === "top" ? offsetY : height - btn.offsetHeight - offsetY
+      );
+      return;
+    }
 
     const accountBtn = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
     if (accountBtn) {
@@ -828,18 +956,31 @@
     const panelHeight = panel.offsetHeight || 420;
 
     let left = btnRect.left;
-    let bottom = window.innerHeight - btnRect.top + 10;
+    let top = "auto";
+    let bottom = window.innerHeight - btnRect.top + 10 + "px";
 
     if (left + panelWidth > window.innerWidth - 16) {
       left = window.innerWidth - panelWidth - 16;
     }
     if (btnRect.top - panelHeight - 10 < 10) {
-      bottom = 16;
+      bottom = "auto";
+      if (btnRect.bottom + 10 + panelHeight <= window.innerHeight - 10) {
+        // The button may be dragged near the top, so open below it.
+        top = btnRect.bottom + 10 + "px";
+      } else {
+        // Neither above nor below fits (button dragged to mid-height): open beside it so it stays clickable.
+        left = btnRect.right + 10 + panelWidth <= window.innerWidth - 16
+          ? btnRect.right + 10
+          : btnRect.left - 10 - panelWidth;
+        const centeredTop = btnRect.top + btnRect.height / 2 - panelHeight / 2;
+        top = Math.max(10, Math.min(centeredTop, window.innerHeight - panelHeight - 10)) + "px";
+      }
     }
 
     panel.style.position = "fixed";
     panel.style.left = Math.max(12, left) + "px";
-    panel.style.bottom = bottom + "px";
+    panel.style.top = top;
+    panel.style.bottom = bottom;
   }
 
   function togglePanel() {
@@ -915,6 +1056,11 @@
     `;
 
     document.body.appendChild(overlay);
+
+    // Rule edits change the panel height; re-anchor it so it stays on screen wherever the button sits.
+    new ResizeObserver(() => {
+      if (panelOpen) positionPanel();
+    }).observe(overlay.querySelector("#tbf-panel"));
 
     // 事件绑定
     overlay.querySelector("#tbf-close").addEventListener("click", togglePanel);
