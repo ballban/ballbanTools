@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日本买房 vs 租房 — 35 年模拟</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <h1>日本买房 vs 租房<small>35 年房贷买房 vs 租房并把差额拿去投资</small></h1>
+    <p>
+      <span class="legend-inline"><span class="dot buy"></span>买房</span>：贷款买房并一直持有。
+      <span class="legend-inline"><span class="dot rent"></span>租房</span>：把同样的钱用来付房租，剩下的全部拿去投资。
+      每年两个家庭在“住房 + 投资”上的总支出相同，所以比较结果只反映住房选择本身的影响。
+      所有数字都可以修改；8 个场景预设基于 2025–2026 年的日本市场数据。
+    </p>
+  </div>
+</header>
+
+<main class="wrap layout">
+  <aside class="controls" id="controls">
+    <section class="card">
+      <h2>场景</h2>
+      <div class="seg-label">地区</div>
+      <div class="seg" data-key="region">
+        <button type="button" data-value="capital">首都圈</button>
+        <button type="button" data-value="regional">非首都圈（大城市）</button>
+      </div>
+      <div class="seg-label">房屋类型</div>
+      <div class="seg" data-key="type">
+        <button type="button" data-value="condo">公寓（マンション）</button>
+        <button type="button" data-value="house">独栋（一戸建て）</button>
+      </div>
+      <div class="seg-label">新旧</div>
+      <div class="seg" data-key="cond">
+        <button type="button" data-value="new">新房（新築）</button>
+        <button type="button" data-value="used">二手（中古）</button>
+      </div>
+      <div class="preset-note" id="presetNote"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="resetPreset" title="重新载入当前场景的预设值，保留房贷、投资和经济环境设置">恢复场景预设值</button>
+        <button type="button" class="btn" id="resetAll" title="把所有参数恢复为默认值">全部重置</button>
+      </div>
+    </section>
+    <div id="paramGroups"></div>
+  </aside>
+
+  <section class="results">
+    <section class="card verdict" id="verdict"></section>
+    <div class="kpis" id="kpis"></div>
+
+    <section class="card">
+      <h2>净资产变化</h2>
+      <p class="sub" id="nwSub"></p>
+      <div class="chart-box"><canvas id="chartNW"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>每年现金流</h2>
+      <p class="sub">堆叠柱：两个家庭每年的住房支出（左柱 = 买房，右柱 = 租房）。虚线：两个家庭当年的投资额。第 0 年的一次性支出（首付、购房杂费、入住费用）见下方表格。</p>
+      <div class="chart-box"><canvas id="chartCF"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>买房一方的房产价值与贷款</h2>
+      <p class="sub">房产市值分为土地（不折旧）和建筑（随房龄折旧），并与剩余贷款对比。</p>
+      <div class="chart-box short"><canvas id="chartBS"></canvas></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>逐年明细</h2><p class="sub" id="tableSub" style="margin:0"></p></div>
+        <button type="button" class="btn" id="csvBtn">下载 CSV</button>
+      </div>
+      <div class="table-wrap"><table id="yearTable"></table></div>
+    </section>
+
+    <section class="card">
+      <h2>8 个场景一览</h2>
+      <p class="sub">每个场景预设搭配你当前的房贷、投资和经济环境设置。点击某一行即可载入该场景。</p>
+      <div class="table-wrap" style="max-height:none"><table id="matrix"></table></div>
+    </section>
+
+    <section class="card prose" id="method"></section>
+    <section class="card prose" id="sources"></section>
+  </section>
+</main>
+<footer>仅为学习用途的模拟，不构成投资建议。所有金额单位为万円（1 万日元）。</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
+<script src="app.js"></script>
+</body>
+</html>
