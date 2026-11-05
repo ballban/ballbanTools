@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Index of ballban's browser tools." />
+    <title>ballban Tools</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --card: #ffffff;
+        --text: #1f2328;
+        --muted: #656d76;
+        --border: #d0d7de;
+        --accent: #0969da;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d1117;
+          --card: #161b22;
+          --text: #e6edf3;
+          --muted: #8d96a0;
+          --border: #30363d;
+          --accent: #4493f8;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 48px 20px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.8rem;
+      }
+
+      .subtitle {
+        margin: 0 0 32px;
+        color: var(--muted);
+      }
+
+      ul {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      a {
+        display: block;
+        height: 100%;
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card);
+        color: inherit;
+        text-decoration: none;
+        transition: border-color 0.15s, transform 0.15s;
+      }
+
+      a:hover,
+      a:focus-visible {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+      }
+
+      .name {
+        margin: 0 0 6px;
+        color: var(--accent);
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      .desc {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ballban Tools</h1>
+      <p class="subtitle">Small browser tools. Everything runs locally in your browser.</p>
+      <ul>
+        <li>
+          <a href="./ffmpeg-command-builder/">
+            <p class="name">FFmpeg Command Builder</p>
+            <p class="desc">Build copy-ready FFmpeg commands without uploading any video.</p>
+          </a>
+        </li>
+        <li>
+          <a href="./mortgage-investment-comparator/">
+            <p class="name">Mortgage vs Investment</p>
+            <p class="desc">Compare buying a home with renting and investing the difference until the loan is paid off.</p>
+          </a>
+        </li>
+        <li>
+          <a href="./mortgage-investment-comparator-claude/">
+            <p class="name">Buy vs Rent in Japan (35-Year Simulation)</p>
+            <p class="desc">Alternative version of the buy-vs-rent simulation for Japan.</p>
+          </a>
+        </li>
+        <li>
+          <a href="./work-motivation-generator/">
+            <p class="name">Work Motivation Generator</p>
+            <p class="desc">Live earnings ticker with after-tax income calculation for China and Japan.</p>
+          </a>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>
