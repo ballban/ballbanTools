@@ -118,12 +118,12 @@
     const dow = new Date(year, month - 1, day).getDay();
     const isWeekend = dow === 0 || dow === 6;
     const calendar = getYearCalendar(country, year);
-    if (!calendar) return { isWorkday: !isWeekend, restLabel: isWeekend ? '周末' : '', hasHolidayData: false };
+    if (!calendar) return { isWorkday: !isWeekend, restLabel: isWeekend ? '周末' : '' };
     const key = dateKey(year, month, day);
-    if (calendar.makeupWorkdays.has(key)) return { isWorkday: true, restLabel: '', hasHolidayData: true };
+    if (calendar.makeupWorkdays.has(key)) return { isWorkday: true, restLabel: '' };
     const holidayName = calendar.holidays.get(key);
-    if (holidayName) return { isWorkday: false, restLabel: holidayName, hasHolidayData: true };
-    return { isWorkday: !isWeekend, restLabel: isWeekend ? '周末' : '', hasHolidayData: true };
+    if (holidayName) return { isWorkday: false, restLabel: holidayName };
+    return { isWorkday: !isWeekend, restLabel: isWeekend ? '周末' : '' };
   }
 
   // --- Calculate Calendar Month Workdays (weekends and public holidays excluded) ---
@@ -153,8 +153,7 @@
       totalWorkdays: Math.max(1, totalWorkdays),
       pastWorkdays,
       isTodayWorkday: today.isWorkday,
-      todayRestLabel: today.restLabel,
-      hasHolidayData: today.hasHolidayData
+      todayRestLabel: today.restLabel
     };
   }
 

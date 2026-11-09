@@ -15,7 +15,9 @@
     useNetForTicker: true,
     workDaysPerMonth: initialMonthStats.totalWorkdays,
     startTime: '09:00',
-    workHours: 9, // 含默认 1 小时休息，即默认 09:00 - 18:00
+    workHours: 8, // Paid work time, excluding the break
+    breakStartTime: '12:00',
+    breakHours: 1,
     settingsCollapsed: false,
     mode: 'schedule', // 'schedule' or 'stopwatch'
     stopwatchRunning: false,
@@ -116,7 +118,9 @@
       jpResidentTax: state.jpResidentTax,
       useNetForTicker: state.useNetForTicker,
       startTime: state.startTime,
-      workHours: state.workHours,
+      paidWorkHours: state.workHours,
+      breakStartTime: state.breakStartTime,
+      breakHours: state.breakHours,
       settingsCollapsed: state.settingsCollapsed,
       mode: state.mode,
       muted: state.muted,
@@ -152,7 +156,10 @@
     if (parsed.jpResidentTax === 'standard' || parsed.jpResidentTax === 'firstYear') state.jpResidentTax = parsed.jpResidentTax;
     if (typeof parsed.useNetForTicker === 'boolean') state.useNetForTicker = parsed.useNetForTicker;
     if (typeof parsed.startTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.startTime)) state.startTime = parsed.startTime;
-    if (isNum(parsed.workHours) && parsed.workHours > 0) state.workHours = parsed.workHours;
+    // Older saves stored `workHours` as a span that included the break, so they are intentionally not read.
+    if (isNum(parsed.paidWorkHours) && parsed.paidWorkHours > 0) state.workHours = parsed.paidWorkHours;
+    if (typeof parsed.breakStartTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.breakStartTime)) state.breakStartTime = parsed.breakStartTime;
+    if (isNum(parsed.breakHours) && parsed.breakHours >= 0) state.breakHours = parsed.breakHours;
     if (typeof parsed.settingsCollapsed === 'boolean') state.settingsCollapsed = parsed.settingsCollapsed;
     if (parsed.mode === 'schedule' || parsed.mode === 'stopwatch') state.mode = parsed.mode;
     if (typeof parsed.muted === 'boolean') state.muted = parsed.muted;
@@ -234,22 +241,46 @@
     return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
   }
 
+  function parseTimeToSeconds(str, fallback) {
+    const [h, m] = (str || fallback).split(':').map(Number);
+    return ((h || 0) * 60 + (m || 0)) * 60;
+  }
+
+  function formatHours(hours) {
+    return String(Math.round(hours * 100) / 100);
+  }
+
+  // Paid work time only; clock-out is pushed back by any break that falls inside the work day.
   function getDailyWorkSeconds() {
-    const [sh, sm] = (state.startTime || '09:00').split(':').map(Number);
-    const startMin = (sh || 0) * 60 + (sm || 0);
-    const durationHours = Math.max(0.5, Math.min(24, Number(state.workHours) || 9));
-    const totalWorkSeconds = Math.round(durationHours * 3600);
-    const startSecondsOfDay = startMin * 60;
-    const endSecondsOfDay = startSecondsOfDay + totalWorkSeconds;
-    return { startSecondsOfDay, endSecondsOfDay, totalWorkSeconds };
+    const startSecondsOfDay = parseTimeToSeconds(state.startTime, '09:00');
+    const totalWorkSeconds = Math.round(Math.max(0.5, Math.min(24, Number(state.workHours) || 8)) * 3600);
+
+    const breakSeconds = Math.round(Math.max(0, Number(state.breakHours) || 0) * 3600);
+    const rawBreakStart = parseTimeToSeconds(state.breakStartTime, '12:00');
+    let breakStartSecondsOfDay = Math.max(startSecondsOfDay, rawBreakStart);
+    let breakEndSecondsOfDay = Math.max(startSecondsOfDay, rawBreakStart + breakSeconds);
+    if (breakStartSecondsOfDay >= startSecondsOfDay + totalWorkSeconds) {
+      // Break starts after the paid hours are already done, so it does not affect today.
+      breakStartSecondsOfDay = breakEndSecondsOfDay = startSecondsOfDay + totalWorkSeconds;
+    }
+    const endSecondsOfDay = startSecondsOfDay + totalWorkSeconds + (breakEndSecondsOfDay - breakStartSecondsOfDay);
+    return { startSecondsOfDay, endSecondsOfDay, breakStartSecondsOfDay, breakEndSecondsOfDay, totalWorkSeconds };
+  }
+
+  function getPaidSecondsUntil(secondsOfDay) {
+    const { startSecondsOfDay, endSecondsOfDay, breakStartSecondsOfDay, breakEndSecondsOfDay } = getDailyWorkSeconds();
+    const t = Math.min(endSecondsOfDay, Math.max(startSecondsOfDay, secondsOfDay));
+    const breakElapsed = Math.max(0, Math.min(t, breakEndSecondsOfDay) - breakStartSecondsOfDay);
+    return t - startSecondsOfDay - breakElapsed;
+  }
+
+  function formatClock(secondsOfDay) {
+    const totalMinutes = Math.floor(secondsOfDay / 60) % (24 * 60);
+    return String(Math.floor(totalMinutes / 60)).padStart(2, '0') + ':' + String(totalMinutes % 60).padStart(2, '0');
   }
 
   function getComputedEndTimeString() {
-    const { endSecondsOfDay } = getDailyWorkSeconds();
-    const totalMinutes = Math.floor(endSecondsOfDay / 60) % (24 * 60);
-    const eh = Math.floor(totalMinutes / 60);
-    const em = totalMinutes % 60;
-    return String(eh).padStart(2, '0') + ':' + String(em).padStart(2, '0');
+    return formatClock(getDailyWorkSeconds().endSecondsOfDay);
   }
 
   function getActiveMonthlyBasis() {
@@ -281,10 +312,22 @@
     document.getElementById('summaryNetText').textContent =
       formatCurrency(state.netMonthly, isJP ? 0 : 2);
     const endStr = getComputedEndTimeString();
+    const paidHoursStr = formatHours(getDailyWorkSeconds().totalWorkSeconds / 3600);
+    const breakStr = state.breakHours > 0
+      ? `午休 ${state.breakStartTime} 起 ${formatHours(state.breakHours)}h，`
+      : '';
     document.getElementById('summaryScheduleText').textContent =
-      `${state.startTime} - ${endStr} (${state.workHours}h含休) · 本月 ${state.workDaysPerMonth} 个标准工作日`;
+      `${state.startTime} - ${endStr} (${breakStr}实际计薪 ${paidHoursStr}h) · 本月 ${state.workDaysPerMonth} 个标准工作日`;
     const endHint = document.getElementById('autoEndTimeHint');
     if (endHint) endHint.textContent = `${endStr} 下班`;
+    const paidHint = document.getElementById('paidHoursHint');
+    if (paidHint) paidHint.textContent = `${paidHoursStr} 小时`;
+    const breakEndHint = document.getElementById('breakEndHint');
+    if (breakEndHint) {
+      breakEndHint.textContent = state.breakHours > 0
+        ? formatClock(parseTimeToSeconds(state.breakStartTime, '12:00') + Math.round(state.breakHours * 3600)) + ' 结束'
+        : '不休息';
+    }
   }
 
   // --- Recalculate Tax & Update Static UI ---
@@ -332,9 +375,7 @@
       ? '注：按令和8年分所得税（給与所得控除、基礎控除）、令和8年度住民税及协会けんぽ东京费率估算，未计奖金和其他扣除。'
       : '注：按个税起征点 ¥5,000/月，扣除五险一金后按综合所得阶梯税率估算，未计专项附加扣除。';
 
-    document.getElementById('autoWorkDaysDisplay').textContent = monthStats.hasHolidayData
-      ? `${monthStats.totalWorkdays} 天 (${monthStats.month}月，已扣除节假日)`
-      : `${monthStats.totalWorkdays} 天 (${monthStats.month}月，未收录${monthStats.year}年节假日，按周一至周五计)`;
+    document.getElementById('autoWorkDaysDisplay').textContent = `${monthStats.totalWorkdays} 天`;
     document.getElementById('rateDayNote').textContent =
       `按本月${monthStats.totalWorkdays}日`;
 
@@ -414,6 +455,8 @@
     document.getElementById('selectJpResidentTax').value = state.jpResidentTax;
     document.getElementById('inputStartTime').value = state.startTime;
     document.getElementById('inputWorkHours').value = state.workHours;
+    document.getElementById('inputBreakStartTime').value = state.breakStartTime;
+    document.getElementById('inputBreakHours').value = state.breakHours;
     document.getElementById('autoEndTimeHint').textContent = getComputedEndTimeString() + ' 下班';
 
     if (state.useNetForTicker) {
@@ -535,12 +578,13 @@
     const monthStats = getMonthWorkdayStats(now, state.country);
     const monthlyBasis = getActiveMonthlyBasis();
     const dailyIncome = monthlyBasis / monthStats.totalWorkdays;
-    const { startSecondsOfDay, endSecondsOfDay, totalWorkSeconds } = getDailyWorkSeconds();
+    const { startSecondsOfDay, endSecondsOfDay, breakStartSecondsOfDay, breakEndSecondsOfDay, totalWorkSeconds } = getDailyWorkSeconds();
 
     let phase;
     let workedSecondsToday = 0;
     let secondsToStart = 0;
     let secondsToEnd = 0;
+    let secondsToBreakEnd = 0;
 
     if (state.mode === 'schedule') {
       const currentSecondsOfDay =
@@ -554,9 +598,12 @@
         phase = 'afterWork';
         workedSecondsToday = totalWorkSeconds;
       } else {
-        phase = 'working';
-        workedSecondsToday = currentSecondsOfDay - startSecondsOfDay;
+        phase = currentSecondsOfDay >= breakStartSecondsOfDay && currentSecondsOfDay < breakEndSecondsOfDay
+          ? 'onBreak'
+          : 'working';
+        workedSecondsToday = getPaidSecondsUntil(currentSecondsOfDay);
         secondsToEnd = endSecondsOfDay - currentSecondsOfDay;
+        secondsToBreakEnd = breakEndSecondsOfDay - currentSecondsOfDay;
       }
     } else {
       phase = 'stopwatch';
@@ -575,7 +622,7 @@
     const monthCumulativeEarned = Math.min(monthlyBasis, monthStats.pastWorkdays * dailyIncome + todayContribution);
 
     return {
-      monthStats, monthlyBasis, phase, workedSecondsToday, secondsToStart, secondsToEnd,
+      monthStats, monthlyBasis, phase, workedSecondsToday, secondsToStart, secondsToEnd, secondsToBreakEnd,
       earnedToday, progressPercent, monthCumulativeEarned
     };
   }
@@ -624,6 +671,10 @@
       statusEl.textContent = '今日已圆满下班';
       progressEl.textContent = '🎉 今日搬砖目标 100% 达成！';
       remainingEl.textContent = '已下班，尽情享受生活吧！';
+    } else if (live.phase === 'onBreak') {
+      statusEl.textContent = '休息中 · 暂停计薪';
+      progressEl.textContent = '今日搬砖进度：' + progressPercent.toFixed(2) + '%';
+      remainingEl.textContent = '距离休息结束还有 ' + formatDuration(live.secondsToBreakEnd);
     } else if (live.phase === 'working') {
       statusEl.textContent = '实时入账中';
       progressEl.textContent = '今日搬砖进度：' + progressPercent.toFixed(2) + '%';
@@ -786,10 +837,29 @@
   });
 
   document.getElementById('inputWorkHours').addEventListener('input', (e) => {
-    state.workHours = Math.max(0.5, Math.min(24, Number(e.target.value) || 9));
+    state.workHours = Math.max(0.5, Math.min(24, Number(e.target.value) || 8));
     updateRatesAndSlackingDisplay();
     renderSettingsCollapseState();
     savePreferences();
+  });
+
+  document.getElementById('inputBreakStartTime').addEventListener('change', (e) => {
+    state.breakStartTime = e.target.value || '12:00';
+    updateRatesAndSlackingDisplay();
+    renderSettingsCollapseState();
+    savePreferences();
+  });
+
+  // Same as the salary field: do not write back while typing, so clearing the field does not snap to 0.
+  const breakHoursInput = document.getElementById('inputBreakHours');
+  breakHoursInput.addEventListener('input', (e) => {
+    state.breakHours = Math.max(0, Math.min(12, Number(e.target.value) || 0));
+    updateRatesAndSlackingDisplay();
+    renderSettingsCollapseState();
+    savePreferences();
+  });
+  breakHoursInput.addEventListener('change', (e) => {
+    e.target.value = state.breakHours;
   });
 
   // Mode switching

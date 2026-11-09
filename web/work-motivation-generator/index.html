@@ -182,23 +182,37 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2 flex flex-col justify-center">
-                <span class="text-[11px] text-slate-400">当月标准计薪日 (按日历算)</span>
-                <span id="autoWorkDaysDisplay" class="text-xs font-mono-num font-bold text-amber-400 mt-0.5">21 天 (本月工作日)</span>
+            <!-- Read-only values derived from the calendar and the schedule below -->
+            <div class="grid grid-cols-2 gap-2.5">
+              <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2">
+                <span class="block text-[11px] text-slate-400">当月标准工作日</span>
+                <span id="autoWorkDaysDisplay" class="text-sm font-mono-num font-bold text-amber-400">21 天</span>
               </div>
-              <div>
-                <label for="inputStartTime" class="block text-[11px] text-slate-400 mb-1">上班时间</label>
-                <input id="inputStartTime" type="time" value="09:00" class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono-num text-white outline-none focus:border-amber-400" />
+              <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2">
+                <span class="block text-[11px] text-slate-400">每日实际计薪时长</span>
+                <span id="paidHoursHint" class="text-sm font-mono-num font-bold text-emerald-400">8 小时</span>
               </div>
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <label for="inputWorkHours" class="text-[11px] text-slate-400">上班时长 (含1h休息)</label>
-                  <span id="autoEndTimeHint" class="text-[11px] font-mono-num text-emerald-400">18:00 下班</span>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                <span class="w-24 shrink-0 text-[11px] text-slate-400">上班时间与时长</span>
+                <div class="flex flex-1 flex-wrap items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 focus-within:border-amber-400">
+                  <input id="inputStartTime" type="time" value="09:00" aria-label="上班时间" class="bg-transparent font-mono-num text-white outline-none" />
+                  <span>起，上班</span>
+                  <input id="inputWorkHours" type="number" min="1" max="24" step="0.5" value="8" aria-label="工作时长" class="w-14 px-1.5 py-0.5 bg-slate-950 border border-slate-700 rounded text-center font-mono-num text-white outline-none focus:border-amber-400" />
+                  <span>小时</span>
+                  <span id="autoEndTimeHint" class="ml-auto font-mono-num text-emerald-400">18:00 下班</span>
                 </div>
-                <div class="relative">
-                  <input id="inputWorkHours" type="number" min="1" max="24" step="0.5" value="9" class="w-full pl-2.5 pr-10 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono-num text-white outline-none focus:border-amber-400" />
-                  <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">小时</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                <span class="w-24 shrink-0 text-[11px] text-slate-400">休息时间与时长</span>
+                <div class="flex flex-1 flex-wrap items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 focus-within:border-amber-400">
+                  <input id="inputBreakStartTime" type="time" value="12:00" aria-label="休息开始时间" class="bg-transparent font-mono-num text-white outline-none" />
+                  <span>起，休息</span>
+                  <input id="inputBreakHours" type="number" min="0" max="12" step="0.25" value="1" aria-label="休息时长" class="w-14 px-1.5 py-0.5 bg-slate-950 border border-slate-700 rounded text-center font-mono-num text-white outline-none focus:border-amber-400" />
+                  <span>小时</span>
+                  <span id="breakEndHint" class="ml-auto font-mono-num text-sky-400">13:00 结束</span>
                 </div>
               </div>
             </div>
