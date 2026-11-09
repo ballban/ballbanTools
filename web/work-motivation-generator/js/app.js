@@ -169,12 +169,7 @@
     document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
       el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
     });
-    document.querySelectorAll('.lang-btn').forEach(btn => {
-      const active = btn.getAttribute('data-lang') === state.language;
-      btn.className = 'lang-btn px-2 py-1 rounded-lg font-semibold transition ' +
-        (active ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:text-white');
-      btn.setAttribute('aria-pressed', String(active));
-    });
+    document.getElementById('selectLanguage').value = state.language;
   }
 
 
@@ -526,12 +521,11 @@
   function renderCountryUI() {
     const cfg = countryConfig[state.country];
 
-    document.querySelectorAll('.country-btn').forEach(btn => {
-      const active = btn.getAttribute('data-country') === state.country;
-      btn.className = 'country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ' +
-        (active ? 'bg-amber-500 text-slate-950 shadow' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white');
-      btn.setAttribute('aria-pressed', String(active));
+    const countrySelect = document.getElementById('selectCountry');
+    Array.from(countrySelect.options).forEach(opt => {
+      opt.textContent = countryConfig[opt.value].flag + ' ' + t('settings.country' + opt.value);
     });
+    countrySelect.value = state.country;
     document.querySelectorAll('.currency-symbol').forEach(el => {
       el.textContent = cfg.symbol;
     });
@@ -868,9 +862,7 @@
     savePreferences();
   }
 
-  document.querySelectorAll('.country-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchCountry(btn.getAttribute('data-country')));
-  });
+  document.getElementById('selectCountry').addEventListener('change', (e) => switchCountry(e.target.value));
 
   const salaryInput = document.getElementById('inputGrossSalary');
   // Do not write back to the field while typing, otherwise clearing it immediately turns into 0.
@@ -1083,9 +1075,7 @@
     savePreferences();
   }
 
-  document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchLanguage(btn.getAttribute('data-lang')));
-  });
+  document.getElementById('selectLanguage').addEventListener('change', (e) => switchLanguage(e.target.value));
 
   // Initialize: load saved preferences first
   loadPreferences();

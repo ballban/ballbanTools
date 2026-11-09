@@ -37,11 +37,14 @@
 
       <!-- Right Controls: Language, Toggle Settings & Sound -->
       <div class="flex items-center gap-2">
-        <div role="group" aria-label="界面语言" data-i18n-aria-label="header.language" class="inline-flex rounded-xl bg-slate-800/90 border border-slate-700/70 p-0.5 text-xs">
-          <button type="button" data-lang="zh" lang="zh-CN" class="lang-btn px-2 py-1 rounded-lg font-semibold transition bg-amber-500 text-slate-950">中文</button>
-          <button type="button" data-lang="en" lang="en" class="lang-btn px-2 py-1 rounded-lg font-semibold transition text-slate-300 hover:text-white">EN</button>
-          <button type="button" data-lang="ja" lang="ja" class="lang-btn px-2 py-1 rounded-lg font-semibold transition text-slate-300 hover:text-white">日本語</button>
-          <button type="button" data-lang="ko" lang="ko" class="lang-btn px-2 py-1 rounded-lg font-semibold transition text-slate-300 hover:text-white">한국어</button>
+        <div class="relative">
+          <select id="selectLanguage" aria-label="界面语言" data-i18n-aria-label="header.language" class="appearance-none [color-scheme:dark] cursor-pointer pl-2.5 pr-7 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700/70 text-slate-200 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-amber-500/60">
+            <option value="zh" lang="zh-CN">🌐 中文</option>
+            <option value="en" lang="en">🌐 English</option>
+            <option value="ja" lang="ja">🌐 日本語</option>
+            <option value="ko" lang="ko">🌐 한국어</option>
+          </select>
+          <span aria-hidden="true" class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">▼</span>
         </div>
 
         <button id="btnHeaderToggleSettings" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700/70 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5">
@@ -106,24 +109,16 @@
 
           <!-- Step 1: Country Selection (Moved inside Settings Panel) -->
           <div class="space-y-1.5">
-            <label data-i18n="settings.countryLabel" class="block text-xs font-medium text-slate-300">1. 选择工作国家（自动匹配货币与税率规则）</label>
-            <div class="grid grid-cols-2 gap-2.5" role="group" aria-label="国家选择" data-i18n-aria-label="settings.countryGroup">
-              <button type="button" data-country="CN" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-amber-500 text-slate-950 shadow">
-                <span class="text-base">🇨🇳</span>
-                <span data-i18n="settings.countryCN">中国 · 人民币 (CNY ¥)</span>
-              </button>
-              <button type="button" data-country="JP" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
-                <span class="text-base">🇯🇵</span>
-                <span data-i18n="settings.countryJP">日本 · 日元 (JPY 円)</span>
-              </button>
-              <button type="button" data-country="US" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
-                <span class="text-base">🇺🇸</span>
-                <span data-i18n="settings.countryUS">美国纽约 · 美元 (USD $)</span>
-              </button>
-              <button type="button" data-country="KR" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
-                <span class="text-base">🇰🇷</span>
-                <span data-i18n="settings.countryKR">韩国首尔 · 韩元 (KRW ₩)</span>
-              </button>
+            <label for="selectCountry" data-i18n="settings.countryLabel" class="block text-xs font-medium text-slate-300">1. 选择工作国家（自动匹配货币与税率规则）</label>
+            <div class="relative">
+              <!-- Option text (flag + translated name) is rendered by renderCountryUI. -->
+              <select id="selectCountry" class="appearance-none [color-scheme:dark] cursor-pointer w-full pl-4 pr-10 py-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-white text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-amber-500/60">
+                <option value="CN">🇨🇳 中国 · 人民币 (CNY ¥)</option>
+                <option value="JP">🇯🇵 日本 · 日元 (JPY 円)</option>
+                <option value="US">🇺🇸 美国纽约 · 美元 (USD $)</option>
+                <option value="KR">🇰🇷 韩国首尔 · 韩元 (KRW ₩)</option>
+              </select>
+              <span aria-hidden="true" class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-amber-400">▼</span>
             </div>
           </div>
 
