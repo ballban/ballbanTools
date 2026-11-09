@@ -1,12 +1,15 @@
 (function () {
-  const { quotes, getMonthWorkdayStats, calculateChinaTax, calculateJapanTax } = window.WM;
+  const { quotes, messages, getMonthWorkdayStats, calculateChinaTax, calculateJapanTax } = window.WM;
 
   const STORAGE_KEY = 'work_motivator_prefs_v3';
+  const LANGUAGES = ['zh', 'en', 'ko'];
+  const HTML_LANG = { zh: 'zh-CN', en: 'en', ko: 'ko' };
 
   const initialMonthStats = getMonthWorkdayStats(new Date(), 'CN');
 
   // --- State ---
   const state = {
+    language: 'zh',
     country: 'CN',
     grossSalary: 15000,
     cnSocialRate: 18.5,
@@ -38,58 +41,76 @@
     taxMonthly: 0
   };
 
+  // Display text (country name, units, preset labels, reward names) lives in i18n.js.
   const countryConfig = {
     CN: {
-      name: '中国',
       flag: '🇨🇳',
       currencyCode: 'CNY',
       symbol: '¥',
-      unitLabel: '人民币 元/月',
-      suffixLabel: 'CNY/月',
       defaultSalary: 15000,
-      presets: [
-        { label: '8千', value: 8000 },
-        { label: '1.2万', value: 12000 },
-        { label: '1.5万', value: 15000 },
-        { label: '2.5万', value: 25000 },
-        { label: '3.5万', value: 35000 },
-        { label: '5万', value: 50000 }
-      ],
+      presets: [8000, 12000, 15000, 25000, 35000, 50000],
       rewards: [
-        { icon: '☕', name: '瑞幸生椰拿铁', price: 9.9, unit: '杯' },
-        { icon: '🍔', name: '麦当劳早餐套组', price: 15, unit: '份' },
-        { icon: '🧋', name: '喜茶多肉葡萄', price: 19, unit: '杯' },
-        { icon: '🍗', name: '疯狂星期四套餐', price: 49.9, unit: '顿' },
-        { icon: '🍲', name: '海底捞单人畅吃', price: 145, unit: '顿' },
-        { icon: '🎮', name: 'Switch 热门游戏卡带', price: 299, unit: '张' }
+        { icon: '☕', id: 'luckin', price: 9.9 },
+        { icon: '🍔', id: 'mcdBreakfast', price: 15 },
+        { icon: '🧋', id: 'heytea', price: 19 },
+        { icon: '🍗', id: 'kfcThursday', price: 49.9 },
+        { icon: '🍲', id: 'haidilao', price: 145 },
+        { icon: '🎮', id: 'switchGame', price: 299 }
       ]
     },
     JP: {
-      name: '日本',
       flag: '🇯🇵',
       currencyCode: 'JPY',
       symbol: '¥',
-      unitLabel: '日元 円/月',
-      suffixLabel: 'JPY/月',
       defaultSalary: 350000,
-      presets: [
-        { label: '22万円', value: 220000 },
-        { label: '30万円', value: 300000 },
-        { label: '35万円', value: 350000 },
-        { label: '50万円', value: 500000 },
-        { label: '70万円', value: 700000 },
-        { label: '100万円', value: 1000000 }
-      ],
+      presets: [220000, 300000, 350000, 500000, 700000, 1000000],
       rewards: [
-        { icon: '☕', name: 'セブンカフェ コーヒー', price: 140, unit: '杯' },
-        { icon: '🐂', name: '松屋 牛めし並盛', price: 480, unit: '碗' },
-        { icon: '🥤', name: 'スタバ フラペチーノ', price: 605, unit: '杯' },
-        { icon: '🍜', name: '一蘭 天然とんこつラーメン', price: 1180, unit: '碗' },
-        { icon: '🥩', name: '国産牛焼肉食べ放題', price: 7000, unit: '顿' },
-        { icon: '🏰', name: 'ディズニー 1デーパス', price: 10900, unit: '张' }
+        { icon: '☕', id: 'sevenCafe', price: 140 },
+        { icon: '🐂', id: 'matsuya', price: 480 },
+        { icon: '🥤', id: 'frappuccino', price: 605 },
+        { icon: '🍜', id: 'ichiran', price: 1180 },
+        { icon: '🥩', id: 'yakiniku', price: 7000 },
+        { icon: '🏰', id: 'disney', price: 10900 }
       ]
     }
   };
+
+  // --- i18n ---
+  function t(key, params) {
+    const own = messages[state.language] || {};
+    const msg = key in own ? own[key] : (key in messages.zh ? messages.zh[key] : key);
+    if (typeof msg !== 'string' || !params) return msg;
+    return msg.replace(/\{(\w+)\}/g, (m, name) => (name in params ? params[name] : m));
+  }
+
+  function getRestLabel(monthStats) {
+    const name = monthStats.todayHolidayName;
+    if (!name) return t('weekend');
+    return t('holidays')[name] || name;
+  }
+
+  function getQuotes() {
+    return quotes[state.language] || quotes.zh;
+  }
+
+  function applyStaticTranslations() {
+    document.documentElement.lang = HTML_LANG[state.language];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.getAttribute('data-i18n'));
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      el.title = t(el.getAttribute('data-i18n-title'));
+    });
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+      el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+    });
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      const active = btn.getAttribute('data-lang') === state.language;
+      btn.className = 'lang-btn px-2 py-1 rounded-lg font-semibold transition ' +
+        (active ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:text-white');
+      btn.setAttribute('aria-pressed', String(active));
+    });
+  }
 
 
   // --- Persistence (localStorage: Chrome does not store cookies for file:// pages) ---
@@ -110,6 +131,7 @@
 
   function savePreferences() {
     const payload = {
+      language: state.language,
       country: state.country,
       grossSalary: state.grossSalary,
       cnSocialRate: state.cnSocialRate,
@@ -147,6 +169,7 @@
     if (!parsed || typeof parsed !== 'object') return;
 
     const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+    if (LANGUAGES.includes(parsed.language)) state.language = parsed.language;
     if (parsed.country === 'CN' || parsed.country === 'JP') state.country = parsed.country;
     if (isNum(parsed.grossSalary) && parsed.grossSalary >= 0) state.grossSalary = parsed.grossSalary;
     if (isNum(parsed.cnSocialRate)) state.cnSocialRate = parsed.cnSocialRate;
@@ -293,17 +316,18 @@
     if (state.settingsCollapsed) {
       panel.classList.add('hidden');
       collapsedBar.classList.remove('hidden');
-      headerBtnLabel.textContent = '展开薪资设置';
+      headerBtnLabel.textContent = t('header.expandSettings');
     } else {
       panel.classList.remove('hidden');
       collapsedBar.classList.add('hidden');
-      headerBtnLabel.textContent = '收起薪资设置';
+      headerBtnLabel.textContent = t('header.collapseSettings');
     }
 
     const cfg = countryConfig[state.country];
     const isJP = state.country === 'JP';
-    document.getElementById('summaryCountryBadge').textContent =
-      `${cfg.flag} ${cfg.name} (${cfg.currencyCode} ¥)`;
+    document.getElementById('summaryCountryBadge').textContent = t('summary.country', {
+      flag: cfg.flag, name: t('country.' + state.country), code: cfg.currencyCode
+    });
     document.getElementById('summaryGrossText').textContent =
       formatCurrency(state.grossSalary, 0);
     document.getElementById('summaryNetText').textContent =
@@ -311,19 +335,22 @@
     const endStr = getComputedEndTimeString();
     const paidHoursStr = formatHours(getDailyWorkSeconds().totalWorkSeconds / 3600);
     const breakStr = state.breakHours > 0
-      ? `午休 ${state.breakStartTime} 起 ${formatHours(state.breakHours)}h，`
+      ? t('summary.break', { start: state.breakStartTime, hours: formatHours(state.breakHours) })
       : '';
-    document.getElementById('summaryScheduleText').textContent =
-      `${state.startTime} - ${endStr} (${breakStr}实际计薪 ${paidHoursStr}h) · 本月 ${state.workDaysPerMonth} 个标准工作日`;
+    document.getElementById('summaryScheduleText').textContent = t('summary.schedule', {
+      start: state.startTime, end: endStr, breakText: breakStr, paid: paidHoursStr, days: state.workDaysPerMonth
+    });
     const endHint = document.getElementById('autoEndTimeHint');
-    if (endHint) endHint.textContent = `${endStr} 下班`;
+    if (endHint) endHint.textContent = t('settings.endHint', { time: endStr });
     const paidHint = document.getElementById('paidHoursHint');
-    if (paidHint) paidHint.textContent = `${paidHoursStr} 小时`;
+    if (paidHint) paidHint.textContent = t('settings.hours', { n: paidHoursStr });
     const breakEndHint = document.getElementById('breakEndHint');
     if (breakEndHint) {
       breakEndHint.textContent = state.breakHours > 0
-        ? formatClock(parseTimeToSeconds(state.breakStartTime, '12:00') + Math.round(state.breakHours * 3600)) + ' 结束'
-        : '不休息';
+        ? t('settings.breakEndHint', {
+          time: formatClock(parseTimeToSeconds(state.breakStartTime, '12:00') + Math.round(state.breakHours * 3600))
+        })
+        : t('settings.noBreak');
     }
   }
 
@@ -340,9 +367,10 @@
       const rate = state.jpDeductionRate === null ? res.autoDeductionRate : state.jpDeductionRate;
       document.getElementById('sliderJpDeductionRate').value = rate;
       document.getElementById('labelJpDeductionRate').textContent = rate.toFixed(1) + '%';
-      document.getElementById('btnJpAutoRate').textContent = state.jpDeductionRate === null
-        ? `按工资自动估算中 (${res.autoDeductionRate.toFixed(1)}%)`
-        : `已手动调整 · 恢复按工资自动 (${res.autoDeductionRate.toFixed(1)}%)`;
+      document.getElementById('btnJpAutoRate').textContent = t(
+        state.jpDeductionRate === null ? 'settings.jpAutoRate' : 'settings.jpManualRate',
+        { rate: res.autoDeductionRate.toFixed(1) }
+      );
     }
 
     state.netMonthly = res.net;
@@ -355,10 +383,11 @@
     const taxPct = Math.min(100, Math.max(0, (res.tax / gross) * 100));
 
     const isJP = state.country === 'JP';
+    const c = state.country;
     document.getElementById('annualGrossHint').textContent =
-      '年薪约 ' + formatCurrency(res.gross * 12, 0);
+      t('settings.annualGross', { amount: formatCurrency(res.gross * 12, 0) });
     document.getElementById('takeHomePercentBadge').textContent =
-      (isJP ? '手取り率 ' : '到手率 ') + netPct.toFixed(1) + '%';
+      t('result.takeHome.' + c, { pct: netPct.toFixed(1) });
 
     document.getElementById('displayNetMonthly').textContent =
       formatCurrency(res.net, isJP ? 0 : 2);
@@ -369,21 +398,18 @@
     document.getElementById('barSocial').style.width = socialPct + '%';
     document.getElementById('barTax').style.width = taxPct + '%';
 
-    document.getElementById('labelBreakdownNet').textContent = isJP ? '手取り月収' : '税后到手';
-    document.getElementById('labelBreakdownSocial').textContent = isJP ? '社会保険料' : '五险一金';
-    document.getElementById('labelBreakdownTax').textContent = isJP ? '所得税+住民税' : '个人所得税';
+    document.getElementById('labelBreakdownNet').textContent = t('result.net.' + c);
+    document.getElementById('labelBreakdownSocial').textContent = t('result.social.' + c);
+    document.getElementById('labelBreakdownTax').textContent = t('result.tax.' + c);
 
     document.getElementById('valBreakdownNet').textContent = formatCurrency(res.net, 0);
     document.getElementById('valBreakdownSocial').textContent = formatCurrency(res.social, 0);
     document.getElementById('valBreakdownTax').textContent = formatCurrency(res.tax, 0);
 
-    document.getElementById('taxFormulaNote').textContent = isJP
-      ? '注：扣除率默认按工资自动估算（东京协会けんぽ、40岁未满、含住民税；令和8年分所得税、令和8年度住民税），手动调整后按估算比例拆分社保与税，未计奖金和其他扣除。'
-      : '注：按个税起征点 ¥5,000/月，扣除五险一金后按综合所得阶梯税率估算，未计专项附加扣除。';
+    document.getElementById('taxFormulaNote').textContent = t('result.note.' + c);
 
-    document.getElementById('autoWorkDaysDisplay').textContent = `${monthStats.totalWorkdays} 天`;
-    document.getElementById('rateDayNote').textContent =
-      `按本月${monthStats.totalWorkdays}日`;
+    document.getElementById('autoWorkDaysDisplay').textContent = t('settings.days', { n: monthStats.totalWorkdays });
+    document.getElementById('rateDayLabel').textContent = t('rate.day', { n: monthStats.totalWorkdays });
 
     updateRatesAndSlackingDisplay();
     renderSettingsCollapseState();
@@ -417,24 +443,27 @@
       const itemWorth = perMinute * item.min;
       const priceEl = document.getElementById('slackPrice-' + item.key);
       const timesEl = document.getElementById('slackTimes-' + item.key);
+      const minutesEl = document.getElementById('slackCount-' + item.key);
       if (priceEl) {
-        priceEl.textContent = '≈ +' + formatCurrency(itemWorth, isJP ? 0 : 2) + '/次';
+        priceEl.textContent = t('slack.price', { amount: formatCurrency(itemWorth, isJP ? 0 : 2) });
       }
       if (timesEl) {
-        timesEl.textContent = '已点 ' + (state.slackCounts[item.key] || 0) + ' 次';
+        timesEl.textContent = t('slack.times', { n: state.slackCounts[item.key] || 0 });
+      }
+      if (minutesEl) {
+        minutesEl.textContent = t('slack.minutesBadge', { n: item.min });
       }
     });
 
     const totalSlackEarned = state.slackMinutesTotal * perMinute;
     document.getElementById('slackingMinutesLabel').textContent =
-      `今日累计摸鱼 ${state.slackMinutesTotal} 分钟`;
+      t('slack.totalMinutes', { n: state.slackMinutesTotal });
     document.getElementById('slackingTotalEarned').textContent =
       formatCurrency(totalSlackEarned, isJP ? 0 : 2);
   }
 
   // --- Render Presets & Country UI ---
   function renderCountryUI() {
-    const cfg = countryConfig[state.country];
     const isCN = state.country === 'CN';
 
     const btnCN = document.getElementById('btnCountryCN');
@@ -447,12 +476,10 @@
       btnCN.className = 'py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white';
     }
 
-    document.getElementById('currencyBadge').textContent = isCN
-      ? 'CNY (人民币 ¥)'
-      : 'JPY (日本円 ¥)';
+    document.getElementById('currencyBadge').textContent = t('currency.' + state.country);
 
-    document.getElementById('labelGrossUnit').textContent = cfg.unitLabel;
-    document.getElementById('inputCurrencySuffix').textContent = cfg.suffixLabel;
+    document.getElementById('labelGrossUnit').textContent = t('unit.' + state.country);
+    document.getElementById('inputCurrencySuffix').textContent = t('suffix.' + state.country);
     document.getElementById('inputGrossSalary').value = state.grossSalary;
     document.getElementById('inputGrossSalary').step = isCN ? '500' : '10000';
     document.getElementById('sliderCnSocialRate').value = state.cnSocialRate;
@@ -461,17 +488,18 @@
     document.getElementById('inputWorkHours').value = state.workHours;
     document.getElementById('inputBreakStartTime').value = state.breakStartTime;
     document.getElementById('inputBreakHours').value = state.breakHours;
-    document.getElementById('autoEndTimeHint').textContent = getComputedEndTimeString() + ' 下班';
+    document.getElementById('autoEndTimeHint').textContent = t('settings.endHint', { time: getComputedEndTimeString() });
 
     if (state.useNetForTicker) {
       document.getElementById('btnUseNet').className = 'px-2.5 py-1 rounded-md font-medium bg-amber-500 text-slate-950 transition';
       document.getElementById('btnUseGross').className = 'px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition';
-      document.getElementById('tickerBasisLabel').textContent = '税后净收入';
     } else {
       document.getElementById('btnUseGross').className = 'px-2.5 py-1 rounded-md font-medium bg-amber-500 text-slate-950 transition';
       document.getElementById('btnUseNet').className = 'px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition';
-      document.getElementById('tickerBasisLabel').textContent = '税前总收入';
     }
+    document.getElementById('tickerTitleLabel').textContent = t('hero.todayTitle', {
+      basis: t(state.useNetForTicker ? 'hero.basisNet' : 'hero.basisGross')
+    });
 
     document.getElementById('cnTaxOptions').classList.toggle('hidden', !isCN);
     document.getElementById('jpTaxOptions').classList.toggle('hidden', isCN);
@@ -482,19 +510,20 @@
   function renderSalaryPresets() {
     const presetContainer = document.getElementById('salaryPresetContainer');
     presetContainer.innerHTML = '';
-    countryConfig[state.country].presets.forEach(p => {
+    const labels = t('presets.' + state.country);
+    countryConfig[state.country].presets.forEach((value, i) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      const active = Number(state.grossSalary) === p.value;
+      const active = Number(state.grossSalary) === value;
       btn.className = 'px-2.5 py-1 rounded-lg text-xs font-mono-num transition border ' +
         (active
           ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-semibold'
           : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-600');
-      btn.textContent = p.label;
+      btn.textContent = labels[i];
       btn.addEventListener('click', () => {
-        state.grossSalary = p.value;
+        state.grossSalary = value;
         state.jpDeductionRate = null;
-        document.getElementById('inputGrossSalary').value = p.value;
+        document.getElementById('inputGrossSalary').value = value;
         renderSalaryPresets();
         updateTaxCalculation();
         savePreferences();
@@ -509,7 +538,9 @@
     const grid = document.getElementById('rewardsGrid');
     grid.innerHTML = '';
 
+    const itemTexts = t('rewards.items');
     cfg.rewards.forEach(item => {
+      const [name, unit] = itemTexts[item.id];
       const count = earnedToday / item.price;
       const pct = Math.min(100, (count % 1) * 100);
       const fullUnits = Math.floor(count);
@@ -521,12 +552,12 @@
           <div class="flex items-center gap-2">
             <span class="text-2xl">${item.icon}</span>
             <div>
-              <div class="text-xs font-semibold text-slate-100">${item.name}</div>
-              <div class="text-[11px] font-mono-num text-slate-400">单价 ${formatCurrency(item.price, state.country === 'JP' ? 0 : 1)}</div>
+              <div class="text-xs font-semibold text-slate-100">${name}</div>
+              <div class="text-[11px] font-mono-num text-slate-400">${t('rewards.unitPrice', { price: formatCurrency(item.price, state.country === 'JP' ? 0 : 1) })}</div>
             </div>
           </div>
           <span class="px-2 py-0.5 rounded-md text-xs font-mono-num font-bold ${fullUnits >= 1 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-400'}">
-            × ${count.toFixed(1)} ${item.unit}
+            ${t('rewards.count', { count: count.toFixed(1), unit })}
           </span>
         </div>
         <div class="space-y-1">
@@ -534,8 +565,8 @@
             <div class="h-full bg-gradient-to-r from-amber-400 to-emerald-400" style="width: ${pct.toFixed(1)}%"></div>
           </div>
           <div class="flex justify-between text-[10px] text-slate-400">
-            <span>已稳赚 ${fullUnits} ${item.unit}</span>
-            <span>下一${item.unit}进度 ${pct.toFixed(0)}%</span>
+            <span>${t('rewards.earned', { n: fullUnits, unit })}</span>
+            <span>${t('rewards.next', { unit, pct: pct.toFixed(0) })}</span>
           </div>
         </div>
       `;
@@ -656,40 +687,41 @@
     const timeStr = [now.getHours(), now.getMinutes(), now.getSeconds()]
       .map(n => String(n).padStart(2, '0'))
       .join(':');
-    document.getElementById('currentClockDisplay').textContent = '当前时间 ' + timeStr;
-    const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    document.getElementById('todayDateBadge').textContent =
-      `${monthStats.month}月${monthStats.todayDate}日 (${weekNames[now.getDay()]})`;
+    document.getElementById('currentClockDisplay').textContent = t('hero.clock', { time: timeStr });
+    document.getElementById('todayDateBadge').textContent = t('hero.date', {
+      month: monthStats.month, day: monthStats.todayDate, weekday: t('weekdays')[now.getDay()]
+    });
 
     const statusEl = document.getElementById('liveStatusText');
     const progressEl = document.getElementById('workProgressText');
     const remainingEl = document.getElementById('timeRemainingText');
+    const pctStr = progressPercent.toFixed(2);
     if (live.phase === 'restDay') {
-      statusEl.textContent = '今日休息';
-      progressEl.textContent = `今天是${monthStats.todayRestLabel}，不计薪`;
-      remainingEl.textContent = '好好休息，养足精神！';
+      statusEl.textContent = t('status.restDay');
+      progressEl.textContent = t('progress.restDay', { label: getRestLabel(monthStats) });
+      remainingEl.textContent = t('remaining.restDay');
     } else if (live.phase === 'beforeWork') {
-      statusEl.textContent = '待上班发车';
-      progressEl.textContent = '今日尚未到上班时间';
-      remainingEl.textContent = '距离上班还有 ' + formatDuration(live.secondsToStart);
+      statusEl.textContent = t('status.beforeWork');
+      progressEl.textContent = t('progress.beforeWork');
+      remainingEl.textContent = t('remaining.beforeWork', { time: formatDuration(live.secondsToStart) });
     } else if (live.phase === 'afterWork') {
-      statusEl.textContent = '今日已圆满下班';
-      progressEl.textContent = '🎉 今日搬砖目标 100% 达成！';
-      remainingEl.textContent = '已下班，尽情享受生活吧！';
+      statusEl.textContent = t('status.afterWork');
+      progressEl.textContent = t('progress.afterWork');
+      remainingEl.textContent = t('remaining.afterWork');
     } else if (live.phase === 'onBreak') {
-      statusEl.textContent = '休息中 · 暂停计薪';
-      progressEl.textContent = '今日搬砖进度：' + progressPercent.toFixed(2) + '%';
-      remainingEl.textContent = '距离休息结束还有 ' + formatDuration(live.secondsToBreakEnd);
+      statusEl.textContent = t('status.onBreak');
+      progressEl.textContent = t('progress.working', { pct: pctStr });
+      remainingEl.textContent = t('remaining.onBreak', { time: formatDuration(live.secondsToBreakEnd) });
     } else if (live.phase === 'working') {
-      statusEl.textContent = '实时入账中';
-      progressEl.textContent = '今日搬砖进度：' + progressPercent.toFixed(2) + '%';
-      remainingEl.textContent = '距离下班还有 ' + formatDuration(live.secondsToEnd);
+      statusEl.textContent = t('status.working');
+      progressEl.textContent = t('progress.working', { pct: pctStr });
+      remainingEl.textContent = t('remaining.working', { time: formatDuration(live.secondsToEnd) });
     } else {
       document.getElementById('stopwatchElapsedText').textContent =
-        '已累计工作: ' + formatDuration(live.workedSecondsToday);
-      statusEl.textContent = state.stopwatchRunning ? '手动计时入账中' : '计时已暂停';
-      progressEl.textContent = '今日计时进度：' + progressPercent.toFixed(2) + '%';
-      remainingEl.textContent = '距离满工时还剩 ' + formatDuration(live.secondsToEnd);
+        t('stopwatch.elapsed', { time: formatDuration(live.workedSecondsToday) });
+      statusEl.textContent = t(state.stopwatchRunning ? 'status.stopwatchRunning' : 'status.stopwatchPaused');
+      progressEl.textContent = t('progress.stopwatch', { pct: pctStr });
+      remainingEl.textContent = t('remaining.stopwatch', { time: formatDuration(live.secondsToEnd) });
     }
 
     const isJP = state.country === 'JP';
@@ -713,19 +745,20 @@
     );
 
     const currentWorkdayIndex = monthStats.pastWorkdays + (monthStats.isTodayWorkday ? 1 : 0);
+    const monthParams = {
+      index: currentWorkdayIndex, total: monthStats.totalWorkdays, past: monthStats.pastWorkdays, month: monthStats.month
+    };
     document.getElementById('monthCalendarBadge').textContent =
-      monthStats.isTodayWorkday
-        ? `本月第 ${currentWorkdayIndex} / ${monthStats.totalWorkdays} 个工作日`
-        : `已完成 ${monthStats.pastWorkdays} / ${monthStats.totalWorkdays} 个工作日`;
+      t(monthStats.isTodayWorkday ? 'month.badgeWorkday' : 'month.badgeRest', monthParams);
 
-    document.getElementById('monthWorkdaysSummary').textContent =
-      `${monthStats.month}月共 ${monthStats.totalWorkdays} 个工作日，已过 ${monthStats.pastWorkdays} 个完整工作日` +
-      (monthStats.isTodayWorkday ? ' + 今日实时入账中' : `（今日${monthStats.todayRestLabel}休息）`);
+    document.getElementById('monthWorkdaysSummary').textContent = monthStats.isTodayWorkday
+      ? t('month.summaryWorkday', monthParams)
+      : t('month.summaryRest', Object.assign({ label: getRestLabel(monthStats) }, monthParams));
 
     document.getElementById('monthProgressPercentText').textContent =
-      `本月进度：${monthProgressPct.toFixed(1)}%`;
+      t('month.progress', { pct: monthProgressPct.toFixed(1) });
     document.getElementById('monthRemainingIncomeText').textContent =
-      `待入账 ${formatCurrency(monthRemaining, 0)}`;
+      t('month.remaining', { amount: formatCurrency(monthRemaining, 0) });
     document.getElementById('monthProgressBar').style.width = monthProgressPct + '%';
 
     if (nowMs - lastRewardRenderTime > 400) {
@@ -738,11 +771,10 @@
   }
 
   // requestAnimationFrame pauses in background tabs, so the title uses its own timer.
-  const BASE_TITLE = '上班鼓励器';
   function updateDocumentTitle() {
     handleDayRollover();
     const { earnedToday } = computeLiveEarnings(new Date());
-    document.title = formatCurrency(earnedToday, state.country === 'JP' ? 0 : 2) + ' · ' + BASE_TITLE;
+    document.title = formatCurrency(earnedToday, state.country === 'JP' ? 0 : 2) + ' · ' + t('app.name');
   }
 
   // --- Event Listeners ---
@@ -750,7 +782,7 @@
     state.settingsCollapsed = true;
     savePreferences();
     renderSettingsCollapseState();
-    showToast('设置已自动保存');
+    showToast(t('toast.saved'));
     playCoinSound();
   }
 
@@ -877,9 +909,9 @@
     document.getElementById('btnModeSchedule').className = isStopwatch ? inactiveClass : activeClass;
     document.getElementById('btnModeStopwatch').className = isStopwatch ? activeClass : inactiveClass;
     document.getElementById('stopwatchControls').classList.toggle('hidden', !isStopwatch);
-    document.getElementById('btnStopwatchToggle').textContent = state.stopwatchRunning
-      ? '⏸️ 暂停计时'
-      : (state.stopwatchAccumulatedMs > 0 ? '▶️ 继续计时赚钱' : '▶️ 开始计时赚钱');
+    document.getElementById('btnStopwatchToggle').textContent = t(state.stopwatchRunning
+      ? 'stopwatch.pause'
+      : (state.stopwatchAccumulatedMs > 0 ? 'stopwatch.resume' : 'stopwatch.start'));
   }
 
   document.getElementById('btnModeSchedule').addEventListener('click', () => {
@@ -925,15 +957,19 @@
 
   // Automatic 1-minute quote rotation
   let lastQuoteSwitchMs = Date.now();
-  state.quoteIndex = Math.floor(Math.random() * quotes.length);
-  document.getElementById('motivationalQuote').textContent = quotes[state.quoteIndex];
+  state.quoteIndex = Math.floor(Math.random() * getQuotes().length);
+
+  function renderQuote() {
+    const list = getQuotes();
+    document.getElementById('motivationalQuote').textContent = list[state.quoteIndex % list.length];
+  }
 
   function updateQuoteRotation(nowMs) {
     const elapsedSec = Math.floor((nowMs - lastQuoteSwitchMs) / 1000);
     if (elapsedSec >= 60) {
       lastQuoteSwitchMs = nowMs;
-      state.quoteIndex = (state.quoteIndex + 1 + Math.floor(Math.random() * 7)) % quotes.length;
-      document.getElementById('motivationalQuote').textContent = quotes[state.quoteIndex];
+      state.quoteIndex = (state.quoteIndex + 1 + Math.floor(Math.random() * 7)) % getQuotes().length;
+      renderQuote();
     }
   }
 
@@ -965,7 +1001,7 @@
       savePreferences();
       spawnCelebrationCoins(
         e.currentTarget,
-        `+${addMinutes}分钟 (${formatCurrency(addedMoney, state.country === 'JP' ? 0 : 2)})`
+        t('slack.coinBadge', { n: addMinutes, amount: formatCurrency(addedMoney, state.country === 'JP' ? 0 : 2) })
       );
     });
   });
@@ -977,11 +1013,30 @@
     savePreferences();
   });
 
+  function switchLanguage(language) {
+    if (state.language === language || !LANGUAGES.includes(language)) return;
+    state.language = language;
+    applyStaticTranslations();
+    renderCountryUI();
+    renderModeUI();
+    updateTaxCalculation();
+    renderQuote();
+    lastRewardRenderTime = 0;
+    updateDocumentTitle();
+    savePreferences();
+  }
+
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchLanguage(btn.getAttribute('data-lang')));
+  });
+
   // Initialize: load saved preferences first
   loadPreferences();
+  applyStaticTranslations();
   renderCountryUI();
   renderModeUI();
   renderMuteUI();
+  renderQuote();
   updateTaxCalculation();
   requestAnimationFrame(tick);
   updateDocumentTitle();

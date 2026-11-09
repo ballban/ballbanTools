@@ -114,16 +114,17 @@
     return calendarCache.get(cacheKey);
   }
 
+  // holidayName is null on ordinary weekends; the UI owns the translated weekend label.
   function getDayInfo(country, year, month, day) {
     const dow = new Date(year, month - 1, day).getDay();
     const isWeekend = dow === 0 || dow === 6;
     const calendar = getYearCalendar(country, year);
-    if (!calendar) return { isWorkday: !isWeekend, restLabel: isWeekend ? '周末' : '' };
+    if (!calendar) return { isWorkday: !isWeekend, holidayName: null };
     const key = dateKey(year, month, day);
-    if (calendar.makeupWorkdays.has(key)) return { isWorkday: true, restLabel: '' };
+    if (calendar.makeupWorkdays.has(key)) return { isWorkday: true, holidayName: null };
     const holidayName = calendar.holidays.get(key);
-    if (holidayName) return { isWorkday: false, restLabel: holidayName };
-    return { isWorkday: !isWeekend, restLabel: isWeekend ? '周末' : '' };
+    if (holidayName) return { isWorkday: false, holidayName };
+    return { isWorkday: !isWeekend, holidayName: null };
   }
 
   // --- Calculate Calendar Month Workdays (weekends and public holidays excluded) ---
@@ -153,7 +154,7 @@
       totalWorkdays: Math.max(1, totalWorkdays),
       pastWorkdays,
       isTodayWorkday: today.isWorkday,
-      todayRestLabel: today.restLabel
+      todayHolidayName: today.holidayName
     };
   }
 
