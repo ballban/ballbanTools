@@ -81,12 +81,12 @@
         { label: '100万円', value: 1000000 }
       ],
       rewards: [
-        { icon: '☕', name: 'セブンカフェ コーヒー', price: 120, unit: '杯' },
-        { icon: '🐂', name: '松屋 牛めし並盛', price: 430, unit: '碗' },
-        { icon: '🥤', name: 'スタバ フラペチーノ', price: 680, unit: '杯' },
-        { icon: '🍜', name: '一蘭 天然とんこつラーメン', price: 1080, unit: '碗' },
-        { icon: '🥩', name: '国産牛焼肉食べ放題', price: 3980, unit: '顿' },
-        { icon: '🏰', name: 'ディズニー 1デーパス', price: 9400, unit: '张' }
+        { icon: '☕', name: 'セブンカフェ コーヒー', price: 140, unit: '杯' },
+        { icon: '🐂', name: '松屋 牛めし並盛', price: 480, unit: '碗' },
+        { icon: '🥤', name: 'スタバ フラペチーノ', price: 605, unit: '杯' },
+        { icon: '🍜', name: '一蘭 天然とんこつラーメン', price: 1180, unit: '碗' },
+        { icon: '🥩', name: '国産牛焼肉食べ放題', price: 7000, unit: '顿' },
+        { icon: '🏰', name: 'ディズニー 1デーパス', price: 10900, unit: '张' }
       ]
     }
   };
