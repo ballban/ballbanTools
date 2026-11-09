@@ -1,5 +1,7 @@
 (function () {
-  const { quotes, messages, getMonthWorkdayStats, calculateChinaTax, calculateJapanTax } = window.WM;
+  const {
+    quotes, messages, getMonthWorkdayStats, calculateChinaTax, calculateJapanTax, calculateUSTax, calculateKoreaTax
+  } = window.WM;
 
   const STORAGE_KEY = 'work_motivator_prefs_v3';
   const LANGUAGES = ['zh', 'en', 'ja', 'ko'];
@@ -13,7 +15,7 @@
     country: 'CN',
     grossSalary: 15000,
     cnSocialRate: 18.5,
-    jpDeductionRate: null, // Manual total deduction %; null follows the salary-based estimate
+    deductionRate: null, // Manual total deduction % (JP/US/KR); null follows the salary-based estimate
     useNetForTicker: true,
     workDaysPerMonth: initialMonthStats.totalWorkdays,
     startTime: '09:00',
@@ -42,11 +44,20 @@
   };
 
   // Display text (country name, units, preset labels, reward names) lives in i18n.js.
+  // rateDecimals: per day / hour / minute / second.
   const countryConfig = {
     CN: {
       flag: '🇨🇳',
       currencyCode: 'CNY',
       symbol: '¥',
+      locale: 'zh-CN',
+      decimals: 2,
+      rateDecimals: [2, 2, 3, 4],
+      heroDecimals: 4,
+      rewardPriceDecimals: 1,
+      salaryStep: 500,
+      coinSymbols: ['🧧', '🪙', '💰', '✨'],
+      calculateTax: (gross) => calculateChinaTax(gross, state.cnSocialRate),
       defaultSalary: 15000,
       presets: [8000, 12000, 15000, 25000, 35000, 50000],
       rewards: [
@@ -62,6 +73,14 @@
       flag: '🇯🇵',
       currencyCode: 'JPY',
       symbol: '¥',
+      locale: 'ja-JP',
+      decimals: 0,
+      rateDecimals: [0, 1, 2, 3],
+      heroDecimals: 2,
+      rewardPriceDecimals: 0,
+      salaryStep: 10000,
+      coinSymbols: ['💴', '🪙', '✨', '💰'],
+      calculateTax: (gross) => calculateJapanTax(gross, state.deductionRate),
       defaultSalary: 350000,
       presets: [220000, 300000, 350000, 500000, 700000, 1000000],
       rewards: [
@@ -71,6 +90,52 @@
         { icon: '🍜', id: 'ichiran', price: 1180 },
         { icon: '🥩', id: 'yakiniku', price: 7000 },
         { icon: '🏰', id: 'disney', price: 10900 }
+      ]
+    },
+    US: {
+      flag: '🇺🇸',
+      currencyCode: 'USD',
+      symbol: '$',
+      locale: 'en-US',
+      decimals: 2,
+      rateDecimals: [2, 2, 3, 4],
+      heroDecimals: 4,
+      rewardPriceDecimals: 2,
+      salaryStep: 500,
+      coinSymbols: ['💵', '🪙', '💰', '✨'],
+      calculateTax: (gross) => calculateUSTax(gross, state.deductionRate),
+      defaultSalary: 7500,
+      presets: [4000, 5000, 7500, 10000, 15000, 25000],
+      rewards: [
+        { icon: '☕', id: 'bodegaCoffee', price: 3 },
+        { icon: '🍕', id: 'joesPizza', price: 4 },
+        { icon: '🥤', id: 'starbucksFrappuccino', price: 7.25 },
+        { icon: '🍔', id: 'shackBurger', price: 7.69 },
+        { icon: '🥪', id: 'katzPastrami', price: 28.95 },
+        { icon: '🏙️', id: 'empireState', price: 49 }
+      ]
+    },
+    KR: {
+      flag: '🇰🇷',
+      currencyCode: 'KRW',
+      symbol: '₩',
+      locale: 'ko-KR',
+      decimals: 0,
+      rateDecimals: [0, 0, 1, 2],
+      heroDecimals: 2,
+      rewardPriceDecimals: 0,
+      salaryStep: 100000,
+      coinSymbols: ['💸', '🪙', '💰', '✨'],
+      calculateTax: (gross) => calculateKoreaTax(gross, state.deductionRate),
+      defaultSalary: 4000000,
+      presets: [2500000, 3000000, 4000000, 5000000, 7000000, 12000000],
+      rewards: [
+        { icon: '☕', id: 'megaCoffee', price: 1700 },
+        { icon: '🍙', id: 'gimbap', price: 3900 },
+        { icon: '🥤', id: 'starbucksAmericano', price: 4700 },
+        { icon: '🍜', id: 'jajangmyeon', price: 7800 },
+        { icon: '🍗', id: 'bbqChicken', price: 23000 },
+        { icon: '🎢', id: 'lotteWorld', price: 64000 }
       ]
     }
   };
@@ -135,7 +200,7 @@
       country: state.country,
       grossSalary: state.grossSalary,
       cnSocialRate: state.cnSocialRate,
-      jpDeductionRate: state.jpDeductionRate,
+      deductionRate: state.deductionRate,
       useNetForTicker: state.useNetForTicker,
       startTime: state.startTime,
       paidWorkHours: state.workHours,
@@ -170,10 +235,12 @@
 
     const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
     if (LANGUAGES.includes(parsed.language)) state.language = parsed.language;
-    if (parsed.country === 'CN' || parsed.country === 'JP') state.country = parsed.country;
+    if (parsed.country in countryConfig) state.country = parsed.country;
     if (isNum(parsed.grossSalary) && parsed.grossSalary >= 0) state.grossSalary = parsed.grossSalary;
     if (isNum(parsed.cnSocialRate)) state.cnSocialRate = parsed.cnSocialRate;
-    if (isNum(parsed.jpDeductionRate)) state.jpDeductionRate = parsed.jpDeductionRate;
+    // Saves from before US/KR support stored the Japan-only override as `jpDeductionRate`.
+    const savedDeductionRate = 'deductionRate' in parsed ? parsed.deductionRate : parsed.jpDeductionRate;
+    if (isNum(savedDeductionRate)) state.deductionRate = savedDeductionRate;
     if (typeof parsed.useNetForTicker === 'boolean') state.useNetForTicker = parsed.useNetForTicker;
     if (typeof parsed.startTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.startTime)) state.startTime = parsed.startTime;
     // Older saves stored `workHours` as a span that included the break, so they are intentionally not read.
@@ -237,20 +304,16 @@
 
   // --- Formatting Helpers ---
   function formatCurrency(val, decimals) {
-    const num = Number(val) || 0;
-    if (state.country === 'JP') {
-      const d = typeof decimals === 'number' ? decimals : 0;
-      return '¥' + num.toLocaleString('ja-JP', {
-        minimumFractionDigits: d,
-        maximumFractionDigits: d
-      });
-    } else {
-      const d = typeof decimals === 'number' ? decimals : 2;
-      return '¥' + num.toLocaleString('zh-CN', {
-        minimumFractionDigits: d,
-        maximumFractionDigits: d
-      });
-    }
+    const cfg = countryConfig[state.country];
+    const d = typeof decimals === 'number' ? decimals : cfg.decimals;
+    return cfg.symbol + formatNumber(val, d);
+  }
+
+  function formatNumber(val, decimals) {
+    return (Number(val) || 0).toLocaleString(countryConfig[state.country].locale, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
   }
 
   function formatDuration(totalSeconds) {
@@ -324,14 +387,13 @@
     }
 
     const cfg = countryConfig[state.country];
-    const isJP = state.country === 'JP';
     document.getElementById('summaryCountryBadge').textContent = t('summary.country', {
-      flag: cfg.flag, name: t('country.' + state.country), code: cfg.currencyCode
+      flag: cfg.flag, name: t('country.' + state.country), code: cfg.currencyCode, symbol: cfg.symbol
     });
     document.getElementById('summaryGrossText').textContent =
       formatCurrency(state.grossSalary, 0);
     document.getElementById('summaryNetText').textContent =
-      formatCurrency(state.netMonthly, isJP ? 0 : 2);
+      formatCurrency(state.netMonthly);
     const endStr = getComputedEndTimeString();
     const paidHoursStr = formatHours(getDailyWorkSeconds().totalWorkSeconds / 3600);
     const breakStr = state.breakHours > 0
@@ -359,16 +421,15 @@
     const monthStats = getMonthWorkdayStats(new Date(), state.country);
     state.workDaysPerMonth = monthStats.totalWorkdays;
 
-    const res = state.country === 'CN'
-      ? calculateChinaTax(state.grossSalary, state.cnSocialRate)
-      : calculateJapanTax(state.grossSalary, state.jpDeductionRate);
+    const res = countryConfig[state.country].calculateTax(state.grossSalary);
 
-    if (state.country === 'JP') {
-      const rate = state.jpDeductionRate === null ? res.autoDeductionRate : state.jpDeductionRate;
-      document.getElementById('sliderJpDeductionRate').value = rate;
-      document.getElementById('labelJpDeductionRate').textContent = rate.toFixed(1) + '%';
-      document.getElementById('btnJpAutoRate').textContent = t(
-        state.jpDeductionRate === null ? 'settings.jpAutoRate' : 'settings.jpManualRate',
+    const usesDeductionRate = typeof res.autoDeductionRate === 'number';
+    if (usesDeductionRate) {
+      const rate = state.deductionRate === null ? res.autoDeductionRate : state.deductionRate;
+      document.getElementById('sliderDeductionRate').value = rate;
+      document.getElementById('labelDeductionRate').textContent = rate.toFixed(1) + '%';
+      document.getElementById('btnAutoDeductionRate').textContent = t(
+        state.deductionRate === null ? 'settings.autoRate' : 'settings.manualRate',
         { rate: res.autoDeductionRate.toFixed(1) }
       );
     }
@@ -382,7 +443,6 @@
     const socialPct = Math.min(100, Math.max(0, (res.social / gross) * 100));
     const taxPct = Math.min(100, Math.max(0, (res.tax / gross) * 100));
 
-    const isJP = state.country === 'JP';
     const c = state.country;
     document.getElementById('annualGrossHint').textContent =
       t('settings.annualGross', { amount: formatCurrency(res.gross * 12, 0) });
@@ -390,7 +450,7 @@
       t('result.takeHome.' + c, { pct: netPct.toFixed(1) });
 
     document.getElementById('displayNetMonthly').textContent =
-      formatCurrency(res.net, isJP ? 0 : 2);
+      formatCurrency(res.net);
     document.getElementById('displayNetAnnual').textContent =
       formatCurrency(res.net * 12, 0);
 
@@ -426,11 +486,11 @@
     const perMinute = perHour / 60;
     const perSecond = perMinute / 60;
 
-    const isJP = state.country === 'JP';
-    document.getElementById('ratePerDay').textContent = formatCurrency(perDay, isJP ? 0 : 2);
-    document.getElementById('ratePerHour').textContent = formatCurrency(perHour, isJP ? 1 : 2);
-    document.getElementById('ratePerMinute').textContent = formatCurrency(perMinute, isJP ? 2 : 3);
-    document.getElementById('ratePerSecond').textContent = formatCurrency(perSecond, isJP ? 3 : 4);
+    const [dayDigits, hourDigits, minuteDigits, secondDigits] = countryConfig[state.country].rateDecimals;
+    document.getElementById('ratePerDay').textContent = formatCurrency(perDay, dayDigits);
+    document.getElementById('ratePerHour').textContent = formatCurrency(perHour, hourDigits);
+    document.getElementById('ratePerMinute').textContent = formatCurrency(perMinute, minuteDigits);
+    document.getElementById('ratePerSecond').textContent = formatCurrency(perSecond, secondDigits);
 
     // Update one-click slacking card prices & counts
     const slackItems = [
@@ -445,7 +505,7 @@
       const timesEl = document.getElementById('slackTimes-' + item.key);
       const minutesEl = document.getElementById('slackCount-' + item.key);
       if (priceEl) {
-        priceEl.textContent = t('slack.price', { amount: formatCurrency(itemWorth, isJP ? 0 : 2) });
+        priceEl.textContent = t('slack.price', { amount: formatCurrency(itemWorth) });
       }
       if (timesEl) {
         timesEl.textContent = t('slack.times', { n: state.slackCounts[item.key] || 0 });
@@ -459,29 +519,29 @@
     document.getElementById('slackingMinutesLabel').textContent =
       t('slack.totalMinutes', { n: state.slackMinutesTotal });
     document.getElementById('slackingTotalEarned').textContent =
-      formatCurrency(totalSlackEarned, isJP ? 0 : 2);
+      formatCurrency(totalSlackEarned);
   }
 
   // --- Render Presets & Country UI ---
   function renderCountryUI() {
-    const isCN = state.country === 'CN';
+    const cfg = countryConfig[state.country];
 
-    const btnCN = document.getElementById('btnCountryCN');
-    const btnJP = document.getElementById('btnCountryJP');
-    if (isCN) {
-      btnCN.className = 'py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-amber-500 text-slate-950 shadow';
-      btnJP.className = 'py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white';
-    } else {
-      btnJP.className = 'py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-amber-500 text-slate-950 shadow';
-      btnCN.className = 'py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white';
-    }
+    document.querySelectorAll('.country-btn').forEach(btn => {
+      const active = btn.getAttribute('data-country') === state.country;
+      btn.className = 'country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ' +
+        (active ? 'bg-amber-500 text-slate-950 shadow' : 'bg-slate-950 border border-slate-800 text-slate-300 hover:text-white');
+      btn.setAttribute('aria-pressed', String(active));
+    });
+    document.querySelectorAll('.currency-symbol').forEach(el => {
+      el.textContent = cfg.symbol;
+    });
 
     document.getElementById('currencyBadge').textContent = t('currency.' + state.country);
 
     document.getElementById('labelGrossUnit').textContent = t('unit.' + state.country);
     document.getElementById('inputCurrencySuffix').textContent = t('suffix.' + state.country);
     document.getElementById('inputGrossSalary').value = state.grossSalary;
-    document.getElementById('inputGrossSalary').step = isCN ? '500' : '10000';
+    document.getElementById('inputGrossSalary').step = String(cfg.salaryStep);
     document.getElementById('sliderCnSocialRate').value = state.cnSocialRate;
     document.getElementById('labelCnSocialRate').textContent = state.cnSocialRate.toFixed(1) + '%';
     document.getElementById('inputStartTime').value = state.startTime;
@@ -501,8 +561,12 @@
       basis: t(state.useNetForTicker ? 'hero.basisNet' : 'hero.basisGross')
     });
 
+    const isCN = state.country === 'CN';
     document.getElementById('cnTaxOptions').classList.toggle('hidden', !isCN);
-    document.getElementById('jpTaxOptions').classList.toggle('hidden', isCN);
+    document.getElementById('deductionTaxOptions').classList.toggle('hidden', isCN);
+    if (!isCN) {
+      document.getElementById('labelDeductionRateTitle').textContent = t('settings.deductionLabel.' + state.country);
+    }
 
     renderSalaryPresets();
   }
@@ -522,7 +586,7 @@
       btn.textContent = labels[i];
       btn.addEventListener('click', () => {
         state.grossSalary = value;
-        state.jpDeductionRate = null;
+        state.deductionRate = null;
         document.getElementById('inputGrossSalary').value = value;
         renderSalaryPresets();
         updateTaxCalculation();
@@ -553,7 +617,7 @@
             <span class="text-2xl">${item.icon}</span>
             <div>
               <div class="text-xs font-semibold text-slate-100">${name}</div>
-              <div class="text-[11px] font-mono-num text-slate-400">${t('rewards.unitPrice', { price: formatCurrency(item.price, state.country === 'JP' ? 0 : 1) })}</div>
+              <div class="text-[11px] font-mono-num text-slate-400">${t('rewards.unitPrice', { price: formatCurrency(item.price, cfg.rewardPriceDecimals) })}</div>
             </div>
           </div>
           <span class="px-2 py-0.5 rounded-md text-xs font-mono-num font-bold ${fullUnits >= 1 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-400'}">
@@ -577,7 +641,7 @@
   // --- Floating Coin Particle Celebration ---
   function spawnCelebrationCoins(originBtn, customBadgeText) {
     playCoinSound();
-    const symbols = state.country === 'JP' ? ['💴', '🪙', '✨', '💰'] : ['🧧', '🪙', '💰', '✨'];
+    const symbols = countryConfig[state.country].coinSymbols;
     const rect = originBtn
       ? originBtn.getBoundingClientRect()
       : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 40 };
@@ -724,12 +788,8 @@
       remainingEl.textContent = t('remaining.stopwatch', { time: formatDuration(live.secondsToEnd) });
     }
 
-    const isJP = state.country === 'JP';
-    const decimals = isJP ? 2 : 4;
-    document.getElementById('heroLiveAmount').textContent = earnedToday.toLocaleString(
-      isJP ? 'ja-JP' : 'zh-CN',
-      { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
-    );
+    const cfg = countryConfig[state.country];
+    document.getElementById('heroLiveAmount').textContent = formatNumber(earnedToday, cfg.heroDecimals);
     document.getElementById('workProgressBar').style.width = Math.max(0, progressPercent) + '%';
 
     // --- Monthly Cumulative Income ---
@@ -738,11 +798,7 @@
       : 0;
     const monthRemaining = Math.max(0, monthlyBasis - monthCumulativeEarned);
 
-    const monthDecimals = isJP ? 0 : 2;
-    document.getElementById('monthCumulativeAmount').textContent = monthCumulativeEarned.toLocaleString(
-      isJP ? 'ja-JP' : 'zh-CN',
-      { minimumFractionDigits: monthDecimals, maximumFractionDigits: monthDecimals }
-    );
+    document.getElementById('monthCumulativeAmount').textContent = formatNumber(monthCumulativeEarned, cfg.decimals);
 
     const currentWorkdayIndex = monthStats.pastWorkdays + (monthStats.isTodayWorkday ? 1 : 0);
     const monthParams = {
@@ -774,7 +830,7 @@
   function updateDocumentTitle() {
     handleDayRollover();
     const { earnedToday } = computeLiveEarnings(new Date());
-    document.title = formatCurrency(earnedToday, state.country === 'JP' ? 0 : 2) + ' · ' + t('app.name');
+    document.title = formatCurrency(earnedToday) + ' · ' + t('app.name');
   }
 
   // --- Event Listeners ---
@@ -805,21 +861,22 @@
     if (state.country === country) return;
     state.country = country;
     state.grossSalary = countryConfig[country].defaultSalary;
-    state.jpDeductionRate = null;
+    state.deductionRate = null;
     renderCountryUI();
     updateTaxCalculation();
     renderRewardsGrid(0);
     savePreferences();
   }
 
-  document.getElementById('btnCountryCN').addEventListener('click', () => switchCountry('CN'));
-  document.getElementById('btnCountryJP').addEventListener('click', () => switchCountry('JP'));
+  document.querySelectorAll('.country-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchCountry(btn.getAttribute('data-country')));
+  });
 
   const salaryInput = document.getElementById('inputGrossSalary');
   // Do not write back to the field while typing, otherwise clearing it immediately turns into 0.
   salaryInput.addEventListener('input', (e) => {
     state.grossSalary = Math.max(0, Number(e.target.value) || 0);
-    state.jpDeductionRate = null;
+    state.deductionRate = null;
     renderSalaryPresets();
     updateTaxCalculation();
     savePreferences();
@@ -846,14 +903,14 @@
     });
   });
 
-  document.getElementById('sliderJpDeductionRate').addEventListener('input', (e) => {
-    state.jpDeductionRate = Number(e.target.value);
+  document.getElementById('sliderDeductionRate').addEventListener('input', (e) => {
+    state.deductionRate = Number(e.target.value);
     updateTaxCalculation();
     savePreferences();
   });
 
-  document.getElementById('btnJpAutoRate').addEventListener('click', () => {
-    state.jpDeductionRate = null;
+  document.getElementById('btnAutoDeductionRate').addEventListener('click', () => {
+    state.deductionRate = null;
     updateTaxCalculation();
     savePreferences();
   });
@@ -1001,7 +1058,7 @@
       savePreferences();
       spawnCelebrationCoins(
         e.currentTarget,
-        t('slack.coinBadge', { n: addMinutes, amount: formatCurrency(addedMoney, state.country === 'JP' ? 0 : 2) })
+        t('slack.coinBadge', { n: addMinutes, amount: formatCurrency(addedMoney) })
       );
     });
   });

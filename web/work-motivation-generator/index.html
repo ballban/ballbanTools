@@ -20,7 +20,7 @@
   <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md sticky top-0 z-30">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-slate-950 font-extrabold text-lg shadow-lg shadow-amber-500/20">
+        <div class="currency-symbol w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-slate-950 font-extrabold text-lg shadow-lg shadow-amber-500/20">
           ¥
         </div>
         <div>
@@ -108,13 +108,21 @@
           <div class="space-y-1.5">
             <label data-i18n="settings.countryLabel" class="block text-xs font-medium text-slate-300">1. 选择工作国家（自动匹配货币与税率规则）</label>
             <div class="grid grid-cols-2 gap-2.5" role="group" aria-label="国家选择" data-i18n-aria-label="settings.countryGroup">
-              <button id="btnCountryCN" type="button" class="py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-amber-500 text-slate-950 shadow">
+              <button type="button" data-country="CN" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-amber-500 text-slate-950 shadow">
                 <span class="text-base">🇨🇳</span>
                 <span data-i18n="settings.countryCN">中国 · 人民币 (CNY ¥)</span>
               </button>
-              <button id="btnCountryJP" type="button" class="py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
+              <button type="button" data-country="JP" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
                 <span class="text-base">🇯🇵</span>
                 <span data-i18n="settings.countryJP">日本 · 日元 (JPY 円)</span>
+              </button>
+              <button type="button" data-country="US" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
+                <span class="text-base">🇺🇸</span>
+                <span data-i18n="settings.countryUS">美国纽约 · 美元 (USD $)</span>
+              </button>
+              <button type="button" data-country="KR" class="country-btn py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-slate-950 border border-slate-800 text-slate-300 hover:text-white">
+                <span class="text-base">🇰🇷</span>
+                <span data-i18n="settings.countryKR">韩国首尔 · 韩元 (KRW ₩)</span>
               </button>
             </div>
           </div>
@@ -126,7 +134,7 @@
               <span id="annualGrossHint" class="text-xs text-slate-400 font-mono-num">年薪约 ¥180,000</span>
             </label>
             <div class="relative">
-              <span id="inputCurrencyPrefix" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold font-mono-num text-lg">¥</span>
+              <span id="inputCurrencyPrefix" class="currency-symbol absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold font-mono-num text-lg">¥</span>
               <input
                 id="inputGrossSalary"
                 type="number"
@@ -162,14 +170,14 @@
             </div>
           </div>
 
-          <div id="jpTaxOptions" class="hidden space-y-3 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/90">
+          <div id="deductionTaxOptions" class="hidden space-y-3 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/90">
             <div class="flex items-center justify-between">
-              <label for="sliderJpDeductionRate" data-i18n="settings.jpDeductionLabel" class="text-xs font-medium text-slate-300">总扣除率 (社会保険+所得税+住民税)</label>
-              <span id="labelJpDeductionRate" class="text-xs font-mono-num font-semibold text-amber-400">20.8%</span>
+              <label id="labelDeductionRateTitle" for="sliderDeductionRate" class="text-xs font-medium text-slate-300">总扣除率 (社会保険+所得税+住民税)</label>
+              <span id="labelDeductionRate" class="text-xs font-mono-num font-semibold text-amber-400">20.8%</span>
             </div>
-            <input id="sliderJpDeductionRate" type="range" min="10" max="50" step="0.1" value="20.8" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" />
+            <input id="sliderDeductionRate" type="range" min="5" max="55" step="0.1" value="20.8" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" />
             <div class="text-[11px] text-slate-500">
-              <button id="btnJpAutoRate" type="button" class="hover:text-amber-400 transition">按工资自动估算中 (20.8%)</button>
+              <button id="btnAutoDeductionRate" type="button" class="hover:text-amber-400 transition">按工资自动估算中 (20.8%)</button>
             </div>
           </div>
 
@@ -338,7 +346,7 @@
               </div>
 
               <div class="py-3 flex items-baseline gap-2">
-                <span id="heroCurrencySymbol" class="text-3xl sm:text-5xl font-extrabold text-amber-400 font-mono-num">¥</span>
+                <span id="heroCurrencySymbol" class="currency-symbol text-3xl sm:text-5xl font-extrabold text-amber-400 font-mono-num">¥</span>
                 <span id="heroLiveAmount" class="text-4xl sm:text-6xl font-extrabold text-white font-mono-num tracking-tight">
                   0.0000
                 </span>
@@ -370,7 +378,7 @@
               </div>
 
               <div class="py-3 flex items-baseline gap-1.5">
-                <span class="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono-num">¥</span>
+                <span class="currency-symbol text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono-num">¥</span>
                 <span id="monthCumulativeAmount" class="text-3xl sm:text-4xl font-extrabold text-white font-mono-num tracking-tight">
                   0.00
                 </span>
