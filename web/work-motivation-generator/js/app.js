@@ -10,8 +10,7 @@
     country: 'CN',
     grossSalary: 15000,
     cnSocialRate: 18.5,
-    jpAgeGroup: 'under40',
-    jpResidentTax: 'standard',
+    jpDeductionRate: null, // Manual total deduction %; null follows the salary-based estimate
     useNetForTicker: true,
     workDaysPerMonth: initialMonthStats.totalWorkdays,
     startTime: '09:00',
@@ -114,8 +113,7 @@
       country: state.country,
       grossSalary: state.grossSalary,
       cnSocialRate: state.cnSocialRate,
-      jpAgeGroup: state.jpAgeGroup,
-      jpResidentTax: state.jpResidentTax,
+      jpDeductionRate: state.jpDeductionRate,
       useNetForTicker: state.useNetForTicker,
       startTime: state.startTime,
       paidWorkHours: state.workHours,
@@ -152,8 +150,7 @@
     if (parsed.country === 'CN' || parsed.country === 'JP') state.country = parsed.country;
     if (isNum(parsed.grossSalary) && parsed.grossSalary >= 0) state.grossSalary = parsed.grossSalary;
     if (isNum(parsed.cnSocialRate)) state.cnSocialRate = parsed.cnSocialRate;
-    if (parsed.jpAgeGroup === 'under40' || parsed.jpAgeGroup === 'over40') state.jpAgeGroup = parsed.jpAgeGroup;
-    if (parsed.jpResidentTax === 'standard' || parsed.jpResidentTax === 'firstYear') state.jpResidentTax = parsed.jpResidentTax;
+    if (isNum(parsed.jpDeductionRate)) state.jpDeductionRate = parsed.jpDeductionRate;
     if (typeof parsed.useNetForTicker === 'boolean') state.useNetForTicker = parsed.useNetForTicker;
     if (typeof parsed.startTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.startTime)) state.startTime = parsed.startTime;
     // Older saves stored `workHours` as a span that included the break, so they are intentionally not read.
@@ -337,7 +334,16 @@
 
     const res = state.country === 'CN'
       ? calculateChinaTax(state.grossSalary, state.cnSocialRate)
-      : calculateJapanTax(state.grossSalary, state.jpAgeGroup, state.jpResidentTax);
+      : calculateJapanTax(state.grossSalary, state.jpDeductionRate);
+
+    if (state.country === 'JP') {
+      const rate = state.jpDeductionRate === null ? res.autoDeductionRate : state.jpDeductionRate;
+      document.getElementById('sliderJpDeductionRate').value = rate;
+      document.getElementById('labelJpDeductionRate').textContent = rate.toFixed(1) + '%';
+      document.getElementById('btnJpAutoRate').textContent = state.jpDeductionRate === null
+        ? `按工资自动估算中 (${res.autoDeductionRate.toFixed(1)}%)`
+        : `已手动调整 · 恢复按工资自动 (${res.autoDeductionRate.toFixed(1)}%)`;
+    }
 
     state.netMonthly = res.net;
     state.socialMonthly = res.social;
@@ -372,7 +378,7 @@
     document.getElementById('valBreakdownTax').textContent = formatCurrency(res.tax, 0);
 
     document.getElementById('taxFormulaNote').textContent = isJP
-      ? '注：按令和8年分所得税（給与所得控除、基礎控除）、令和8年度住民税及协会けんぽ东京费率估算，未计奖金和其他扣除。'
+      ? '注：扣除率默认按工资自动估算（东京协会けんぽ、40岁未满、含住民税；令和8年分所得税、令和8年度住民税），手动调整后按估算比例拆分社保与税，未计奖金和其他扣除。'
       : '注：按个税起征点 ¥5,000/月，扣除五险一金后按综合所得阶梯税率估算，未计专项附加扣除。';
 
     document.getElementById('autoWorkDaysDisplay').textContent = `${monthStats.totalWorkdays} 天`;
@@ -451,8 +457,6 @@
     document.getElementById('inputGrossSalary').step = isCN ? '500' : '10000';
     document.getElementById('sliderCnSocialRate').value = state.cnSocialRate;
     document.getElementById('labelCnSocialRate').textContent = state.cnSocialRate.toFixed(1) + '%';
-    document.getElementById('selectJpAgeGroup').value = state.jpAgeGroup;
-    document.getElementById('selectJpResidentTax').value = state.jpResidentTax;
     document.getElementById('inputStartTime').value = state.startTime;
     document.getElementById('inputWorkHours').value = state.workHours;
     document.getElementById('inputBreakStartTime').value = state.breakStartTime;
@@ -489,6 +493,7 @@
       btn.textContent = p.label;
       btn.addEventListener('click', () => {
         state.grossSalary = p.value;
+        state.jpDeductionRate = null;
         document.getElementById('inputGrossSalary').value = p.value;
         renderSalaryPresets();
         updateTaxCalculation();
@@ -768,6 +773,7 @@
     if (state.country === country) return;
     state.country = country;
     state.grossSalary = countryConfig[country].defaultSalary;
+    state.jpDeductionRate = null;
     renderCountryUI();
     updateTaxCalculation();
     renderRewardsGrid(0);
@@ -781,6 +787,7 @@
   // Do not write back to the field while typing, otherwise clearing it immediately turns into 0.
   salaryInput.addEventListener('input', (e) => {
     state.grossSalary = Math.max(0, Number(e.target.value) || 0);
+    state.jpDeductionRate = null;
     renderSalaryPresets();
     updateTaxCalculation();
     savePreferences();
@@ -807,14 +814,14 @@
     });
   });
 
-  document.getElementById('selectJpAgeGroup').addEventListener('change', (e) => {
-    state.jpAgeGroup = e.target.value;
+  document.getElementById('sliderJpDeductionRate').addEventListener('input', (e) => {
+    state.jpDeductionRate = Number(e.target.value);
     updateTaxCalculation();
     savePreferences();
   });
 
-  document.getElementById('selectJpResidentTax').addEventListener('change', (e) => {
-    state.jpResidentTax = e.target.value;
+  document.getElementById('btnJpAutoRate').addEventListener('click', () => {
+    state.jpDeductionRate = null;
     updateTaxCalculation();
     savePreferences();
   });

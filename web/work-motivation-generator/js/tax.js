@@ -65,11 +65,10 @@
     return 0;
   }
 
-  // Employee-side rates for FY2026: 協会けんぽ Tokyo, 厚生年金, 一般の事業 雇用保険.
+  // Employee-side rates for FY2026, assuming Tokyo 協会けんぽ and under 40 (no 介護保険).
   // Health-type premiums and pension are capped at their standard-remuneration maximums.
   const JP_SOCIAL = {
     health: 0.04925,
-    care: 0.0081,
     childSupport: 0.00115,
     pension: 0.0915,
     employment: 0.005,
@@ -77,13 +76,13 @@
     pensionCap: 650000
   };
 
-  function calculateJapanTax(grossMonthly, ageGroup, residentTaxMode) {
+  // Without deductionRatePercent the total deduction comes from the model. With it, the total is
+  // forced to that share of gross and split between social insurance and tax in the model's ratio.
+  function calculateJapanTax(grossMonthly, deductionRatePercent) {
     const g = Math.max(0, Number(grossMonthly) || 0);
     const annualGross = g * 12;
 
-    const healthBase = Math.min(g, JP_SOCIAL.healthCap);
-    const healthRate = JP_SOCIAL.health + JP_SOCIAL.childSupport + (ageGroup === 'over40' ? JP_SOCIAL.care : 0);
-    const socialMonthly = healthBase * healthRate
+    const socialMonthly = Math.min(g, JP_SOCIAL.healthCap) * (JP_SOCIAL.health + JP_SOCIAL.childSupport)
       + Math.min(g, JP_SOCIAL.pensionCap) * JP_SOCIAL.pension
       + g * JP_SOCIAL.employment;
     const annualSocial = socialMonthly * 12;
@@ -92,19 +91,27 @@
     const taxableIT = Math.max(0, incomeIT - annualSocial - japanIncomeTaxBasicDeduction(incomeIT));
     const annualIT = progressiveTax(taxableIT, JP_INCOME_TAX_BRACKETS) * 1.021;
 
-    let annualRT = 0;
-    if (residentTaxMode === 'standard') {
-      const incomeRT = annualGross - japanEmploymentDeduction(annualGross, 650000);
-      const taxableRT = Math.max(0, incomeRT - annualSocial - japanResidentTaxBasicDeduction(incomeRT));
-      if (taxableRT > 0) {
-        annualRT = taxableRT * 0.10 + 5000;
-      }
-    }
+    const incomeRT = annualGross - japanEmploymentDeduction(annualGross, 650000);
+    const taxableRT = Math.max(0, incomeRT - annualSocial - japanResidentTaxBasicDeduction(incomeRT));
+    const annualRT = taxableRT > 0 ? taxableRT * 0.10 + 5000 : 0;
 
     const taxMonthly = (annualIT + annualRT) / 12;
-    const netMonthly = Math.max(0, g - socialMonthly - taxMonthly);
+    const modelDeduction = Math.min(g, socialMonthly + taxMonthly);
+    const autoDeductionRate = g > 0 ? (modelDeduction / g) * 100 : 0;
 
-    return { gross: g, social: socialMonthly, tax: taxMonthly, net: netMonthly };
+    if (typeof deductionRatePercent !== 'number' || !Number.isFinite(deductionRatePercent)) {
+      return { gross: g, social: socialMonthly, tax: taxMonthly, net: g - modelDeduction, autoDeductionRate };
+    }
+
+    const deduction = g * Math.min(100, Math.max(0, deductionRatePercent)) / 100;
+    const socialShare = modelDeduction > 0 ? socialMonthly / (socialMonthly + taxMonthly) : 1;
+    return {
+      gross: g,
+      social: deduction * socialShare,
+      tax: deduction * (1 - socialShare),
+      net: g - deduction,
+      autoDeductionRate
+    };
   }
 
   WM.calculateChinaTax = calculateChinaTax;

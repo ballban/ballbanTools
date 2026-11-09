@@ -157,18 +157,12 @@
 
           <div id="jpTaxOptions" class="hidden space-y-3 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/90">
             <div class="flex items-center justify-between">
-              <label for="selectJpAgeGroup" class="text-xs font-medium text-slate-300">年龄段 (影响介護保険料)</label>
-              <select id="selectJpAgeGroup" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400">
-                <option value="under40" selected>40岁未满 (健康保険+子育て支援金+厚生年金+雇用保険 ≈ 14.7%)</option>
-                <option value="over40">40~64岁 (含介護保険 ≈ 15.5%)</option>
-              </select>
+              <label for="sliderJpDeductionRate" class="text-xs font-medium text-slate-300">总扣除率 (社会保険+所得税+住民税)</label>
+              <span id="labelJpDeductionRate" class="text-xs font-mono-num font-semibold text-amber-400">20.8%</span>
             </div>
-            <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
-              <label for="selectJpResidentTax" class="text-xs font-medium text-slate-300">住民税计入方式</label>
-              <select id="selectJpResidentTax" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400">
-                <option value="standard" selected>含住民税 (日本工作第2年起标准手取り)</option>
-                <option value="firstYear">免住民税 (来日/新卒第1年手取り)</option>
-              </select>
+            <input id="sliderJpDeductionRate" type="range" min="10" max="50" step="0.1" value="20.8" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" />
+            <div class="text-[11px] text-slate-500">
+              <button id="btnJpAutoRate" type="button" class="hover:text-amber-400 transition">按工资自动估算中 (20.8%)</button>
             </div>
           </div>
 
