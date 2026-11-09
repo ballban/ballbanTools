@@ -2,8 +2,8 @@
   const { quotes, messages, getMonthWorkdayStats, calculateChinaTax, calculateJapanTax } = window.WM;
 
   const STORAGE_KEY = 'work_motivator_prefs_v3';
-  const LANGUAGES = ['zh', 'en', 'ko'];
-  const HTML_LANG = { zh: 'zh-CN', en: 'en', ko: 'ko' };
+  const LANGUAGES = ['zh', 'en', 'ja', 'ko'];
+  const HTML_LANG = { zh: 'zh-CN', en: 'en', ja: 'ja', ko: 'ko' };
 
   const initialMonthStats = getMonthWorkdayStats(new Date(), 'CN');
 
